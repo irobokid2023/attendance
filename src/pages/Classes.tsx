@@ -254,8 +254,8 @@ const Classes = () => {
           'Lego Robotics - Ev3',
           'Lego Robotics - NxT',
           'Python Programming',
-          'Simple Machines and Mechanism',
-          'STEM Fundamentals',
+           'STEM Explorers',
+           'Young Engineers',
         ].includes(form.name)) && form.name !== '' ? (
           <div className="flex gap-2">
             <Input value={form.name === '__custom__' ? '' : form.name} onChange={(e) => setField('name', e.target.value)} placeholder="Enter custom program name" required />
@@ -278,8 +278,8 @@ const Classes = () => {
               <SelectItem value="Lego Robotics - Ev3">Lego Robotics - Ev3</SelectItem>
               <SelectItem value="Lego Robotics - NxT">Lego Robotics - NxT</SelectItem>
               <SelectItem value="Python Programming">Python Programming</SelectItem>
-              <SelectItem value="Simple Machines and Mechanism">Simple Machines and Mechanism</SelectItem>
-              <SelectItem value="STEM Fundamentals">STEM Fundamentals</SelectItem>
+              <SelectItem value="STEM Explorers">STEM Explorers</SelectItem>
+              <SelectItem value="Young Engineers">Young Engineers</SelectItem>
               <SelectItem value="__custom__">Custom</SelectItem>
             </SelectContent>
           </Select>
