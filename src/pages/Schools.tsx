@@ -13,10 +13,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, School, BookOpen, Users, ArrowLeft, Trash2, Pencil, LayoutGrid, List } from 'lucide-react';
+import { Plus, School, BookOpen, Users, ArrowLeft, Trash2, Pencil, LayoutGrid, List, Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { exportSchoolsAsZip } from '@/lib/exportSchoolsZip';
 import { exportToPdf } from '@/lib/exportPdf';
-import ExportDropdown from '@/components/ExportDropdown';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -192,9 +192,9 @@ const Schools = () => {
     setDeleteOpen(false);
   };
 
-  const handleExport = async () => {
-    const ids = filtered.map((s) => s.id);
-    if (ids.length === 0) return;
+  const handleExport = async (scope: 'selected' | 'all') => {
+    const ids = scope === 'selected' ? Array.from(selected) : filtered.map((s) => s.id);
+    if (ids.length === 0) { toast.error(scope === 'selected' ? 'No schools selected' : 'No schools to export'); return; }
     toast.info('Preparing export...');
     try {
       await exportSchoolsAsZip(ids);
@@ -204,10 +204,12 @@ const Schools = () => {
     }
   };
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = async (scope: 'selected' | 'all') => {
+    const schoolsToExport = scope === 'selected' ? filtered.filter(s => selected.has(s.id)) : filtered;
+    if (schoolsToExport.length === 0) { toast.error(scope === 'selected' ? 'No schools selected' : 'No schools to export'); return; }
     toast.info('Preparing PDF export...');
     try {
-      const ids = filtered.map(s => s.id);
+      const ids = schoolsToExport.map(s => s.id);
       const [classesRes, studentsRes, attendanceRes] = await Promise.all([
         supabase.from('classes').select('*').in('school_id', ids),
         supabase.from('students').select('*'),
@@ -220,10 +222,9 @@ const Schools = () => {
       const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
       let htmlContent = '';
-      for (const school of filtered) {
+      for (const school of schoolsToExport) {
         const schoolClasses = allClassesData.filter(c => c.school_id === school.id);
         
-        // School info section
         htmlContent += `<div style="page-break-before:${htmlContent ? 'always' : 'auto'};">`;
         htmlContent += `<h1 style="font-size:18px;margin-bottom:8px;">${school.name}</h1>`;
         htmlContent += `<table style="border-collapse:collapse;width:100%;margin-bottom:20px;">`;
@@ -234,7 +235,6 @@ const Schools = () => {
         htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">Secondary Coordinator</td><td style="border:1px solid #ccc;padding:5px 8px;">${school.secondary_coordinator_name || '—'} ${school.secondary_coordinator_mobile ? `(${school.secondary_coordinator_mobile})` : ''}</td></tr>`;
         htmlContent += `</table>`;
 
-        // Each class with attendance
         for (const cls of schoolClasses) {
           const classStudents = allStudentsData.filter(s => s.class_id === cls.id);
           const classAttendance = allAttendanceData.filter(a => a.class_id === cls.id);
@@ -253,7 +253,6 @@ const Schools = () => {
           htmlContent += `<p style="font-size:11px;color:#666;margin-bottom:6px;">Day: ${cls.day || '—'} | Timing: ${cls.timing || '—'} | Instructor(s): ${cls.instructor_names || '—'} | Venue: ${cls.venue || '—'}</p>`;
           
           htmlContent += `<table style="border-collapse:collapse;width:100%;margin-bottom:16px;font-size:9px;">`;
-          // Header row 1: dates
           htmlContent += `<tr><th style="border:1px solid #333;padding:4px;background:#FFD966;font-weight:bold;text-align:left;">Student</th><th style="border:1px solid #333;padding:4px;background:#FFD966;">Grade</th><th style="border:1px solid #333;padding:4px;background:#FFD966;">Div</th><th style="border:1px solid #333;padding:4px;background:#FFD966;">Total</th>`;
           for (const d of uniqueDates) {
             const parsed = new Date(d + 'T00:00:00');
@@ -261,7 +260,6 @@ const Schools = () => {
           }
           htmlContent += `</tr>`;
           
-          // Data rows
           for (const s of classStudents) {
             const statuses = uniqueDates.map(d => statusMap[s.id]?.[d] === 'present' ? 'P' : statusMap[s.id]?.[d] === 'absent' ? 'A' : '');
             const attended = statuses.filter(x => x === 'P').length;
@@ -388,7 +386,30 @@ const Schools = () => {
             <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-9 w-9 rounded-r-none" onClick={() => setViewMode('grid')}><LayoutGrid className="w-4 h-4" /></Button>
             <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-9 w-9 rounded-l-none" onClick={() => setViewMode('list')}><List className="w-4 h-4" /></Button>
           </div>
-          <ExportDropdown onExportExcel={handleExport} onExportPdf={handleExportPdf} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2" />Export</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {selected.size > 0 && (
+                <>
+                  <DropdownMenuItem onClick={() => handleExport('selected')}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />Selected as Excel ({selected.size})
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportPdf('selected')}>
+                    <FileText className="w-4 h-4 mr-2" />Selected as PDF ({selected.size})
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem onClick={() => handleExport('all')}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />All Schools as Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportPdf('all')}>
+                <FileText className="w-4 h-4 mr-2" />All Schools as PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {selected.size > 0 && (
             <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Delete ({selected.size})</Button>
           )}
