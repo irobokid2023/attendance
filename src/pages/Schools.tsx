@@ -164,7 +164,7 @@ const Schools = () => {
     if (!user) return;
     if (form.days.length === 0) { toast.error('Please select at least one day'); return; }
     if (!form.ir_coordinator_name.trim()) { toast.error('IR Coordinator Name is required'); return; }
-    if (!form.ir_coordinator_mobile.trim()) { toast.error('IR Coordinator Mobile No. is required'); return; }
+    
     setLoading(true);
     const payload = capitalizeFields({ ...form }, ['name', 'address', 'ir_coordinator_name', 'primary_coordinator_name', 'secondary_coordinator_name']);
     if (editId) {
@@ -238,15 +238,17 @@ const Schools = () => {
         for (const cls of schoolClasses) {
           const classStudents = allStudentsData.filter(s => s.class_id === cls.id);
           const classAttendance = allAttendanceData.filter(a => a.class_id === cls.id);
-          const uniqueDates = [...new Set(classAttendance.map(a => a.date))].sort();
+          // Build composite session keys for multi-session per day support
+          const sessionKeySet = new Set<string>();
+          classAttendance.forEach(a => sessionKeySet.add(`${a.date}|${a.topic || ''}`));
+          const sessionKeys = [...sessionKeySet].sort();
 
           const statusMap: Record<string, Record<string, string>> = {};
           classAttendance.forEach(a => {
+            const key = `${a.date}|${a.topic || ''}`;
             if (!statusMap[a.student_id]) statusMap[a.student_id] = {};
-            statusMap[a.student_id][a.date] = a.status;
+            statusMap[a.student_id][key] = a.status;
           });
-          const topicByDate: Record<string, string> = {};
-          classAttendance.forEach(a => { if (a.topic && !topicByDate[a.date]) topicByDate[a.date] = a.topic; });
 
           const sheetLabel = [cls.name, cls.grade, cls.div].filter(Boolean).join(' - ');
           htmlContent += `<h2 style="font-size:14px;margin:16px 0 6px;">${sheetLabel}</h2>`;
@@ -254,20 +256,32 @@ const Schools = () => {
           
           htmlContent += `<table style="border-collapse:collapse;width:100%;margin-bottom:16px;font-size:9px;">`;
           htmlContent += `<tr><th style="border:1px solid #333;padding:4px;background:#FFD966;font-weight:bold;text-align:left;">Student</th><th style="border:1px solid #333;padding:4px;background:#FFD966;">Grade</th><th style="border:1px solid #333;padding:4px;background:#FFD966;">Div</th><th style="border:1px solid #333;padding:4px;background:#FFD966;">Total</th>`;
-          for (const d of uniqueDates) {
+          for (const k of sessionKeys) {
+            const d = k.split('|')[0];
+            const topic = k.split('|')[1] || '';
             const parsed = new Date(d + 'T00:00:00');
-            htmlContent += `<th style="border:1px solid #333;padding:4px;background:#FFD966;font-size:8px;">${parsed.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}<br/>${DAY_NAMES[parsed.getDay()].slice(0,3)}<br/><span style="font-weight:normal;font-size:7px;">${topicByDate[d] ?? ''}</span></th>`;
+            htmlContent += `<th style="border:1px solid #333;padding:4px;background:#FFD966;font-size:8px;">${parsed.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}<br/>${DAY_NAMES[parsed.getDay()].slice(0,3)}<br/><span style="font-weight:normal;font-size:7px;">${topic}</span></th>`;
           }
           htmlContent += `</tr>`;
           
           for (const s of classStudents) {
-            const statuses = uniqueDates.map(d => statusMap[s.id]?.[d] === 'present' ? 'P' : statusMap[s.id]?.[d] === 'absent' ? 'A' : '');
+            const statuses = sessionKeys.map(k => {
+              const st = statusMap[s.id]?.[k] ?? '';
+              if (st === 'present') return 'P';
+              if (st === 'absent') return 'A';
+              if (st === 'kit') return 'K';
+              if (st === 'quiz') return 'Q';
+              if (st === 'left') return 'L';
+              return '';
+            });
             const attended = statuses.filter(x => x === 'P').length;
-            htmlContent += `<tr><td style="border:1px solid #ccc;padding:3px 5px;">${s.full_name}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;">${s.grade ?? ''}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;">${s.div ?? ''}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;font-weight:bold;">${attended}/${uniqueDates.length}</td>`;
+            htmlContent += `<tr><td style="border:1px solid #ccc;padding:3px 5px;">${s.full_name}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;">${s.grade ?? ''}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;">${s.div ?? ''}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;font-weight:bold;">${attended}/${sessionKeys.length}</td>`;
             for (const st of statuses) {
               let bg = '';
               if (st === 'P') bg = 'background:#C6EFCE;color:#006100;font-weight:bold;text-align:center;';
               else if (st === 'A') bg = 'background:#FFC7CE;color:#9C0006;font-weight:bold;text-align:center;';
+              else if (st === 'L') bg = 'background:#8B0000;color:#FFFFFF;font-weight:bold;text-align:center;';
+              else if (st === 'K' || st === 'Q') bg = 'background:#BDD7EE;color:#1F4E79;font-weight:bold;text-align:center;';
               htmlContent += `<td style="border:1px solid #ccc;padding:3px;${bg}">${st}</td>`;
             }
             htmlContent += `</tr>`;
@@ -310,7 +324,7 @@ const Schools = () => {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2"><Label>IR Coordinator Name *</Label><Input value={form.ir_coordinator_name} onChange={(e) => setField('ir_coordinator_name', e.target.value)} required /></div>
-        <div className="space-y-2"><Label>IR Coordinator Mobile No. *</Label><Input value={form.ir_coordinator_mobile} onChange={(e) => setField('ir_coordinator_mobile', e.target.value)} required /></div>
+        <div className="space-y-2"><Label>IR Coordinator Mobile No.</Label><Input value={form.ir_coordinator_mobile} onChange={(e) => setField('ir_coordinator_mobile', e.target.value)} /></div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2"><Label>Primary Coordinator Name</Label><Input value={form.primary_coordinator_name} onChange={(e) => setField('primary_coordinator_name', e.target.value)} /></div>

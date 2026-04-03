@@ -19,7 +19,7 @@ import { exportToPdf } from '@/lib/exportPdf';
 import ExportDropdown from '@/components/ExportDropdown';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const ROMAN_GRADES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'Multiple'];
+const ROMAN_GRADES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 const DIVISIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -124,6 +124,7 @@ const Classes = () => {
   const [deleting, setDeleting] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [customDiv, setCustomDiv] = useState(false);
+  const [customGrade, setCustomGrade] = useState(false);
 
   const fetchData = async () => {
     const [classesRes, schoolsRes, attendanceRes] = await Promise.all([
@@ -174,11 +175,12 @@ const Classes = () => {
 
   const setField = (key: keyof ClassForm, value: any) => setForm((prev) => ({ ...prev, [key]: value }));
 
-  const openAddDialog = () => { setEditId(null); setForm(emptyForm); setCustomDiv(false); setOpen(true); };
+  const openAddDialog = () => { setEditId(null); setForm(emptyForm); setCustomDiv(false); setCustomGrade(false); setOpen(true); };
   const openEditDialog = (cls: any) => {
     setEditId(cls.id);
     const gradeVal = cls.grade ?? '';
     const divVal = cls.div ?? '';
+    setCustomGrade(gradeVal !== '' && !ROMAN_GRADES.includes(gradeVal));
     setCustomDiv(divVal !== '' && !DIVISIONS.includes(divVal));
     setForm({ name: cls.name, school_id: cls.school_id, day: cls.day ?? '', timing: cls.timing ?? '', num_sessions: cls.num_sessions ?? 0, instructor_names: cls.instructor_names ?? '', venue: cls.venue ?? '', grade: gradeVal, div: divVal });
     setOpen(true);
@@ -295,12 +297,20 @@ const Classes = () => {
       <div className="grid grid-cols-2 gap-3">
       <div className="space-y-2">
         <Label>Grade *</Label>
-        <Select value={form.grade} onValueChange={(v) => setField('grade', v)} required>
+        {customGrade ? (
+          <div className="flex gap-2">
+            <Input value={form.grade} onChange={(e) => setField('grade', e.target.value)} placeholder="Enter grade" />
+            <Button type="button" variant="outline" size="sm" onClick={() => { setCustomGrade(false); setField('grade', ''); }}>List</Button>
+          </div>
+        ) : (
+          <Select value={form.grade} onValueChange={(v) => { if (v === '__custom_grade__') { setCustomGrade(true); setField('grade', ''); } else setField('grade', v); }}>
             <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
             <SelectContent>
               {ROMAN_GRADES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+              <SelectItem value="__custom_grade__">Custom...</SelectItem>
             </SelectContent>
           </Select>
+        )}
         </div>
         <div className="space-y-2">
           <Label>Division *</Label>

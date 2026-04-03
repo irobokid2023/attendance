@@ -12,26 +12,33 @@ import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { ClipboardCheck, Check, X, Calendar as CalendarIcon, FileText } from 'lucide-react';
+import { ClipboardCheck, Check, X, Calendar as CalendarIcon, FileText, Package, HelpCircle, LogOut, Plus } from 'lucide-react';
 import { cn, capitalizeWords } from '@/lib/utils';
 import { format } from 'date-fns';
 import { exportToExcel } from '@/lib/exportExcel';
 import { exportToPdf } from '@/lib/exportPdf';
 import ExportDropdown from '@/components/ExportDropdown';
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
-type Status = 'present' | 'absent';
+type Status = 'present' | 'absent' | 'kit' | 'quiz' | 'left';
 
 const statusConfig: Record<Status, { label: string; icon: any; className: string }> = {
   present: { label: 'Present', icon: Check, className: 'bg-success/10 text-success hover:bg-success/20 border-success/20' },
   absent: { label: 'Absent', icon: X, className: 'bg-destructive/10 text-destructive hover:bg-destructive/20 border-destructive/20' },
+  kit: { label: 'Kit', icon: Package, className: 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border-blue-500/20' },
+  quiz: { label: 'Quiz', icon: HelpCircle, className: 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/20' },
+  left: { label: 'Left', icon: LogOut, className: 'bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border-orange-500/20' },
 };
 
-const recordStatusConfig: Record<Status, { label: string; icon: any; className: string }> = {
-  present: { label: 'P', icon: Check, className: 'bg-success/10 text-success border-success/20' },
-  absent: { label: 'A', icon: X, className: 'bg-destructive/10 text-destructive border-destructive/20' },
+const recordStatusConfig: Record<Status, { label: string; className: string }> = {
+  present: { label: 'P', className: 'bg-success/10 text-success border-success/20' },
+  absent: { label: 'A', className: 'bg-destructive/10 text-destructive border-destructive/20' },
+  kit: { label: 'K', className: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+  quiz: { label: 'Q', className: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
+  left: { label: 'L', className: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
 };
+
+const ALL_STATUSES: Status[] = ['present', 'absent', 'kit', 'quiz', 'left'];
 
 const getClassName = (cls: any): string => {
   const parts = [cls.name];
@@ -49,21 +56,24 @@ const Attendance = () => {
   const [filterDay, setFilterDay] = useState('');
   const [students, setStudents] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<Record<string, Status>>({});
-  const [existingAttendance, setExistingAttendance] = useState<Record<string, Status>>({});
   const [saving, setSaving] = useState(false);
   const [sessionStats, setSessionStats] = useState<{ total: number; perStudent: Record<string, number> }>({ total: 0, perStudent: {} });
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [topic, setTopic] = useState('');
-  const [existingTopic, setExistingTopic] = useState('');
   const [activeTab, setActiveTab] = useState('mark');
   const [changeDateOpen, setChangeDateOpen] = useState(false);
   const [newDate, setNewDate] = useState<Date>(new Date());
   const [changingDate, setChangingDate] = useState(false);
 
-  // Records state
+  // Multiple sessions per day
+  const [existingSessions, setExistingSessions] = useState<string[]>([]); // list of topics for date
+  const [selectedSession, setSelectedSession] = useState<string | null>(null); // topic of session being edited, null = new
+  const [isNewSession, setIsNewSession] = useState(false);
+
+  // Records state - sessionKeys are "date|topic" composites
   const [attendanceMap, setAttendanceMap] = useState<Record<string, Record<string, Status>>>({});
-  const [sessionDates, setSessionDates] = useState<string[]>([]);
-  const [topicMap, setTopicMap] = useState<Record<string, string>>({});
+  const [sessionKeys, setSessionKeys] = useState<string[]>([]);
+  const [sessionInfoMap, setSessionInfoMap] = useState<Record<string, { date: string; topic: string }>>({});
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
@@ -92,10 +102,14 @@ const Attendance = () => {
 
   // Fetch students & attendance for Mark tab
   useEffect(() => {
-    if (!filterClass) { setStudents([]); setSessionStats({ total: 0, perStudent: {} }); setTopic(''); setExistingTopic(''); return; }
+    if (!filterClass) {
+      setStudents([]); setSessionStats({ total: 0, perStudent: {} }); setTopic('');
+      setExistingSessions([]); setSelectedSession(null); setIsNewSession(false);
+      return;
+    }
 
     const fetchAll = async () => {
-      const [studentsRes, allAttendanceRes, todayAttendanceRes] = await Promise.all([
+      const [studentsRes, allAttendanceRes, dateAttendanceRes] = await Promise.all([
         supabase.from('students').select('*').eq('class_id', filterClass).order('full_name'),
         supabase.from('attendance').select('student_id, date, status').eq('class_id', filterClass),
         supabase.from('attendance').select('student_id, status, topic').eq('class_id', filterClass).eq('date', dateStr),
@@ -103,37 +117,72 @@ const Attendance = () => {
 
       setStudents(studentsRes.data ?? []);
 
+      // Session stats
       const allRecords = allAttendanceRes.data ?? [];
       const distinctDates = new Set(allRecords.map(r => r.date));
-      const total = distinctDates.size;
-
       const perStudent: Record<string, number> = {};
       allRecords.forEach(r => {
-        if (r.status === 'present') {
-          perStudent[r.student_id] = (perStudent[r.student_id] || 0) + 1;
-        }
+        if (r.status === 'present') perStudent[r.student_id] = (perStudent[r.student_id] || 0) + 1;
       });
-      setSessionStats({ total, perStudent });
+      setSessionStats({ total: distinctDates.size, perStudent });
 
-      const todayRecords = todayAttendanceRes.data ?? [];
-      const existing: Record<string, Status> = {};
-      let savedTopic = '';
-      todayRecords.forEach(a => {
-        existing[a.student_id] = a.status as Status;
-        if ((a as any).topic) savedTopic = (a as any).topic;
-      });
-      setExistingAttendance(existing);
-      setAttendance(existing);
-      setTopic(savedTopic);
-      setExistingTopic(savedTopic);
+      // Sessions for this date (grouped by topic)
+      const dateRecords = dateAttendanceRes.data ?? [];
+      const topicSet = new Set<string>();
+      dateRecords.forEach(r => { if ((r as any).topic) topicSet.add((r as any).topic); });
+      const topics = [...topicSet];
+      setExistingSessions(topics);
+
+      if (topics.length > 0 && !isNewSession) {
+        // Load first session by default
+        const firstTopic = topics[0];
+        setSelectedSession(firstTopic);
+        setTopic(firstTopic);
+        const existing: Record<string, Status> = {};
+        dateRecords.forEach(a => {
+          if ((a as any).topic === firstTopic) existing[a.student_id] = a.status as Status;
+        });
+        setAttendance(existing);
+      } else if (isNewSession) {
+        // New session mode - clear
+        setAttendance({});
+        setTopic('');
+      } else {
+        setSelectedSession(null);
+        setAttendance({});
+        setTopic('');
+      }
     };
 
     fetchAll();
   }, [filterClass, dateStr]);
 
+  // Load specific session when user selects one
+  const loadSession = async (sessionTopic: string) => {
+    setSelectedSession(sessionTopic);
+    setTopic(sessionTopic);
+    setIsNewSession(false);
+    const { data } = await supabase
+      .from('attendance')
+      .select('student_id, status')
+      .eq('class_id', filterClass)
+      .eq('date', dateStr)
+      .eq('topic', sessionTopic);
+    const existing: Record<string, Status> = {};
+    (data ?? []).forEach(a => { existing[a.student_id] = a.status as Status; });
+    setAttendance(existing);
+  };
+
+  const startNewSession = () => {
+    setIsNewSession(true);
+    setSelectedSession(null);
+    setAttendance({});
+    setTopic('');
+  };
+
   // Fetch records data when switching to records tab
   useEffect(() => {
-    if (activeTab !== 'records' || !filterClass) { setAttendanceMap({}); setSessionDates([]); setTopicMap({}); return; }
+    if (activeTab !== 'records' || !filterClass) { setAttendanceMap({}); setSessionKeys([]); setSessionInfoMap({}); return; }
 
     const fetchRecords = async () => {
       const [studentsRes, attendanceRes] = await Promise.all([
@@ -144,18 +193,30 @@ const Attendance = () => {
       setStudents(studentsRes.data ?? []);
 
       const records = attendanceRes.data ?? [];
-      const dates = [...new Set(records.map(r => r.date))].sort((a, b) => b.localeCompare(a));
-      setSessionDates(dates);
-
+      // Build composite keys: "date|topic"
+      const keySet = new Set<string>();
+      const infoMap: Record<string, { date: string; topic: string }> = {};
       const map: Record<string, Record<string, Status>> = {};
-      const topics: Record<string, string> = {};
+
       records.forEach(r => {
+        const topic = r.topic || '';
+        const key = `${r.date}|${topic}`;
+        keySet.add(key);
+        infoMap[key] = { date: r.date, topic };
         if (!map[r.student_id]) map[r.student_id] = {};
-        map[r.student_id][r.date] = r.status as Status;
-        if ((r as any).topic && !(topics[r.date])) topics[r.date] = (r as any).topic;
+        map[r.student_id][key] = r.status as Status;
       });
+
+      // Sort keys by date desc, then topic
+      const sortedKeys = [...keySet].sort((a, b) => {
+        const [dateA] = a.split('|');
+        const [dateB] = b.split('|');
+        return dateB.localeCompare(dateA) || a.localeCompare(b);
+      });
+
+      setSessionKeys(sortedKeys);
+      setSessionInfoMap(infoMap);
       setAttendanceMap(map);
-      setTopicMap(topics);
     };
 
     fetchRecords();
@@ -163,65 +224,82 @@ const Attendance = () => {
 
   const filteredStudents = useMemo(() => students, [students]);
 
-  const toggleStatus = (studentId: string) => {
-    const current = attendance[studentId];
-    const next: Status = current === 'present' ? 'absent' : 'present';
-    setAttendance(prev => ({ ...prev, [studentId]: next }));
+  const cycleStudentStatus = (studentId: string) => {
+    setAttendance(prev => {
+      const current = prev[studentId];
+      const currentIndex = current ? ALL_STATUSES.indexOf(current) : -1;
+      const nextIndex = (currentIndex + 1) % ALL_STATUSES.length;
+      return { ...prev, [studentId]: ALL_STATUSES[nextIndex] };
+    });
+  };
+
+  const setStudentStatus = (studentId: string, status: Status) => {
+    setAttendance(prev => ({ ...prev, [studentId]: status }));
   };
 
   const handleSave = async () => {
     if (!user) return;
+    if (!topic.trim()) { toast.error('Topic of the Day is required'); setSaving(false); return; }
     setSaving(true);
-    const records = Object.entries(attendance)
-      .filter(([id, status]) => existingAttendance[id] !== status || topic !== existingTopic)
-      .map(([student_id, status]) => ({
-        student_id,
-        class_id: filterClass,
-        date: dateStr,
-        status,
-        marked_by: user.id,
-        topic: topic.trim() ? capitalizeWords(topic.trim()) : null,
-      }));
 
-    if (!topic.trim()) {
-      toast.error('Topic of the Day is required');
-      setSaving(false);
-      return;
+    const trimmedTopic = capitalizeWords(topic.trim());
+
+    // If editing an existing session, delete old records first
+    if (selectedSession) {
+      await supabase
+        .from('attendance')
+        .delete()
+        .eq('class_id', filterClass)
+        .eq('date', dateStr)
+        .eq('topic', selectedSession);
     }
 
-    if (records.length === 0 && topic === existingTopic) {
-      toast.info('No changes to save');
-      setSaving(false);
-      return;
-    }
-
-    const finalRecords = records.length > 0 ? records : Object.entries(attendance).map(([student_id, status]) => ({
+    const records = Object.entries(attendance).map(([student_id, status]) => ({
       student_id,
       class_id: filterClass,
       date: dateStr,
       status,
       marked_by: user.id,
-      topic: topic.trim() ? capitalizeWords(topic.trim()) : null,
+      topic: trimmedTopic,
     }));
 
-    const { error } = await supabase.from('attendance').upsert(finalRecords, { onConflict: 'student_id,date' });
+    if (records.length === 0) {
+      toast.info('No attendance to save');
+      setSaving(false);
+      return;
+    }
+
+    const { error } = await supabase.from('attendance').insert(records);
     if (error) toast.error(error.message);
-    else { toast.success('Attendance saved!'); setExistingAttendance({ ...attendance }); setExistingTopic(topic); }
+    else {
+      toast.success('Attendance saved!');
+      setSelectedSession(trimmedTopic);
+      setIsNewSession(false);
+      // Refresh sessions list
+      const { data } = await supabase
+        .from('attendance')
+        .select('topic')
+        .eq('class_id', filterClass)
+        .eq('date', dateStr);
+      const topicSet = new Set<string>();
+      (data ?? []).forEach(r => { if (r.topic) topicSet.add(r.topic); });
+      setExistingSessions([...topicSet]);
+    }
     setSaving(false);
   };
 
   const handleChangeDate = async () => {
-    if (!user || !filterClass) return;
+    if (!user || !filterClass || !selectedSession) return;
     const newDateStr = format(newDate, 'yyyy-MM-dd');
     if (newDateStr === dateStr) { toast.info('Same date selected'); return; }
     setChangingDate(true);
 
-    // Update all attendance records for this class+old date to new date
     const { error } = await supabase
       .from('attendance')
       .update({ date: newDateStr })
       .eq('class_id', filterClass)
-      .eq('date', dateStr);
+      .eq('date', dateStr)
+      .eq('topic', selectedSession);
 
     if (error) {
       toast.error(error.message);
@@ -247,7 +325,7 @@ const Attendance = () => {
       'Division': s.div ?? '',
       'Sessions Attended': sessionStats.perStudent[s.id] || 0,
       'Total Sessions': sessionStats.total,
-      'Status': attendance[s.id] ? (attendance[s.id] === 'present' ? 'Present' : 'Absent') : 'Not marked',
+      'Status': attendance[s.id] ? statusConfig[attendance[s.id]].label : 'Not marked',
     }));
     exportToExcel({ filename: 'attendance.xlsx', sheetName: 'Attendance', rows });
   };
@@ -257,7 +335,7 @@ const Attendance = () => {
     const rows = filteredStudents.map(s => [
       s.full_name, s.grade ?? '—', s.div ?? '—',
       String(sessionStats.perStudent[s.id] || 0), String(sessionStats.total),
-      attendance[s.id] ? (attendance[s.id] === 'present' ? 'P' : 'A') : '-',
+      attendance[s.id] ? recordStatusConfig[attendance[s.id]].label : '-',
     ]);
     exportToPdf({ title: `Attendance - ${format(selectedDate, 'PPP')}`, headers, rows, filename: 'attendance.pdf' });
   };
@@ -276,20 +354,24 @@ const Attendance = () => {
   const handleRecordsExportExcel = () => {
     const rows = filteredStudents.map(s => {
       const rec = attendanceMap[s.id] || {};
-      const attended = sessionDates.filter(d => rec[d] === 'present').length;
-      const row: Record<string, any> = { 'Student Name': s.full_name, 'Total': `${attended}/${sessionDates.length}` };
-      sessionDates.forEach(d => { row[`${formatDate(d)} (${getDayName(d)})`] = rec[d] === 'present' ? 'P' : rec[d] === 'absent' ? 'A' : '-'; });
+      const attended = sessionKeys.filter(k => rec[k] === 'present').length;
+      const row: Record<string, any> = { 'Student Name': s.full_name, 'Total': `${attended}/${sessionKeys.length}` };
+      sessionKeys.forEach(k => {
+        const info = sessionInfoMap[k];
+        const label = `${formatDate(info.date)} (${getDayName(info.date)})${info.topic ? ' - ' + info.topic : ''}`;
+        row[label] = rec[k] ? recordStatusConfig[rec[k]].label : '-';
+      });
       return row;
     });
     exportToExcel({ filename: 'attendance_records.xlsx', sheetName: 'Records', rows });
   };
 
   const handleRecordsExportPdf = () => {
-    const headers = ['Student', 'Total', ...sessionDates.map(d => `${formatDate(d)}`)];
+    const headers = ['Student', 'Total', ...sessionKeys.map(k => { const info = sessionInfoMap[k]; return `${formatDate(info.date)}${info.topic ? '\n' + info.topic : ''}`; })];
     const rows = filteredStudents.map(s => {
       const rec = attendanceMap[s.id] || {};
-      const attended = sessionDates.filter(d => rec[d] === 'present').length;
-      return [s.full_name, `${attended}/${sessionDates.length}`, ...sessionDates.map(d => rec[d] === 'present' ? 'P' : rec[d] === 'absent' ? 'A' : '-')];
+      const attended = sessionKeys.filter(k => rec[k] === 'present').length;
+      return [s.full_name, `${attended}/${sessionKeys.length}`, ...sessionKeys.map(k => rec[k] ? recordStatusConfig[rec[k]].label : '-')];
     });
     exportToPdf({ title: 'Attendance Records', headers, rows, filename: 'attendance_records.pdf' });
   };
@@ -352,10 +434,10 @@ const Attendance = () => {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={selectedDate} onSelect={(d) => d && setSelectedDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+                        <Calendar mode="single" selected={selectedDate} onSelect={(d) => { if (d) { setSelectedDate(d); setIsNewSession(false); setSelectedSession(null); } }} initialFocus className={cn("p-3 pointer-events-auto")} />
                       </PopoverContent>
                     </Popover>
-                    {Object.keys(existingAttendance).length > 0 && (
+                    {selectedSession && (
                       <Button size="sm" variant="outline" onClick={() => { setNewDate(selectedDate); setChangeDateOpen(true); }}>
                         Change Date
                       </Button>
@@ -371,13 +453,36 @@ const Attendance = () => {
                 <ExportDropdown onExportExcel={handleExportExcel} onExportPdf={handleExportPdf} />
               </div>
 
+              {/* Session selector for multiple sessions per day */}
+              {existingSessions.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-muted-foreground">Sessions on this date:</span>
+                  {existingSessions.map(t => (
+                    <Button
+                      key={t}
+                      size="sm"
+                      variant={selectedSession === t && !isNewSession ? 'default' : 'outline'}
+                      onClick={() => loadSession(t)}
+                    >
+                      {t}
+                    </Button>
+                  ))}
+                  <Button size="sm" variant={isNewSession ? 'default' : 'outline'} onClick={startNewSession}>
+                    <Plus className="w-3 h-3 mr-1" /> New Session
+                  </Button>
+                </div>
+              )}
+
               {filteredStudents.length > 0 ? (
                 <>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm text-muted-foreground mr-2">Quick:</span>
-                      <Button size="sm" variant="outline" onClick={() => markAll('present')} className="text-success border-success/30">All Present</Button>
-                      <Button size="sm" variant="outline" onClick={() => markAll('absent')} className="text-destructive border-destructive/30">All Absent</Button>
+                      {ALL_STATUSES.map(s => (
+                        <Button key={s} size="sm" variant="outline" onClick={() => markAll(s)} className={statusConfig[s].className}>
+                          {statusConfig[s].label}
+                        </Button>
+                      ))}
                     </div>
                     <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1.5">
                       <CalendarIcon className="w-3.5 h-3.5" />
@@ -397,8 +502,7 @@ const Attendance = () => {
                       </TableHeader>
                       <TableBody>
                         {filteredStudents.map((s, i) => {
-                          const status = attendance[s.id];
-                          const config = status ? statusConfig[status] : null;
+                          const currentStatus = attendance[s.id];
                           const attended = sessionStats.perStudent[s.id] || 0;
                           return (
                             <TableRow key={s.id}>
@@ -409,20 +513,20 @@ const Attendance = () => {
                                 <span className="text-muted-foreground"> / {sessionStats.total}</span>
                               </TableCell>
                               <TableCell className="text-right">
-                                <button
-                                  onClick={() => toggleStatus(s.id)}
-                                  className={cn(
-                                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer',
-                                    config ? config.className : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
-                                  )}
-                                >
-                                  {config ? (
-                                    <>
-                                      <config.icon className="w-3 h-3" />
-                                      {config.label}
-                                    </>
-                                  ) : 'Not marked'}
-                                </button>
+                                {(() => {
+                                  const config = currentStatus ? statusConfig[currentStatus] : null;
+                                  return (
+                                    <button
+                                      onClick={() => cycleStudentStatus(s.id)}
+                                      className={cn(
+                                        'px-3 py-1.5 rounded text-xs font-medium border transition-colors cursor-pointer min-w-[70px] text-center',
+                                        config ? config.className + ' ring-1 ring-offset-1' : 'bg-muted/30 text-muted-foreground border-border hover:bg-muted/60'
+                                      )}
+                                    >
+                                      {config ? config.label : 'Mark'}
+                                    </button>
+                                  );
+                                })()}
                               </TableCell>
                             </TableRow>
                           );
@@ -445,12 +549,12 @@ const Attendance = () => {
 
             {/* ===== VIEW RECORDS TAB ===== */}
             <TabsContent value="records" className="space-y-4">
-              {filteredStudents.length > 0 && sessionDates.length > 0 ? (
+              {filteredStudents.length > 0 && sessionKeys.length > 0 ? (
                 <>
                   <div className="flex items-center justify-between">
                     <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1.5">
                       <CalendarIcon className="w-3.5 h-3.5" />
-                      Total Sessions: {sessionDates.length}
+                      Total Sessions: {sessionKeys.length}
                     </Badge>
                     <ExportDropdown onExportExcel={handleRecordsExportExcel} onExportPdf={handleRecordsExportPdf} />
                   </div>
@@ -464,38 +568,41 @@ const Attendance = () => {
                               <TableHead className="w-12 sticky left-0 bg-card z-10">#</TableHead>
                               <TableHead className="sticky left-10 bg-card z-10 min-w-[150px]">Student</TableHead>
                               <TableHead className="sticky left-[200px] bg-card z-10 min-w-[80px]">Total</TableHead>
-                              {sessionDates.map(date => (
-                                <TableHead key={date} className="text-center min-w-[100px]">
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <span className="text-xs font-semibold">{formatDate(date)}</span>
-                                    <span className="text-[10px] text-muted-foreground">{getDayName(date)}</span>
-                                    {topicMap[date] && (
-                                      <span className="text-[10px] text-primary truncate max-w-[90px]" title={topicMap[date]}>
-                                        {topicMap[date]}
-                                      </span>
-                                    )}
-                                  </div>
-                                </TableHead>
-                              ))}
+                              {sessionKeys.map(key => {
+                                const info = sessionInfoMap[key];
+                                return (
+                                  <TableHead key={key} className="text-center min-w-[100px]">
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span className="text-xs font-semibold">{formatDate(info.date)}</span>
+                                      <span className="text-[10px] text-muted-foreground">{getDayName(info.date)}</span>
+                                      {info.topic && (
+                                        <span className="text-[10px] text-primary truncate max-w-[90px]" title={info.topic}>
+                                          {info.topic}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </TableHead>
+                                );
+                              })}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {filteredStudents.map((s, i) => {
                               const studentRecords = attendanceMap[s.id] || {};
-                              const attended = sessionDates.filter(d => studentRecords[d] === 'present').length;
+                              const attended = sessionKeys.filter(k => studentRecords[k] === 'present').length;
                               return (
                                 <TableRow key={s.id}>
                                   <TableCell className="text-muted-foreground sticky left-0 bg-card z-10">{i + 1}</TableCell>
                                   <TableCell className="font-medium sticky left-10 bg-card z-10">{s.full_name}</TableCell>
                                   <TableCell className="sticky left-[200px] bg-card z-10 text-center">
                                     <span className="font-semibold">{attended}</span>
-                                    <span className="text-muted-foreground text-xs"> /{sessionDates.length}</span>
+                                    <span className="text-muted-foreground text-xs"> /{sessionKeys.length}</span>
                                   </TableCell>
-                                  {sessionDates.map(date => {
-                                    const status = studentRecords[date];
+                                  {sessionKeys.map(key => {
+                                    const status = studentRecords[key] as Status | undefined;
                                     const config = status ? recordStatusConfig[status] : null;
                                     return (
-                                      <TableCell key={date} className="text-center">
+                                      <TableCell key={key} className="text-center">
                                         {config ? (
                                           <span className={cn('inline-flex items-center justify-center w-7 h-7 rounded-md text-xs font-bold border', config.className)}>
                                             {config.label}
@@ -516,7 +623,7 @@ const Attendance = () => {
                     </ScrollArea>
                   </div>
                 </>
-              ) : filteredStudents.length > 0 && sessionDates.length === 0 ? (
+              ) : filteredStudents.length > 0 && sessionKeys.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">No attendance sessions recorded yet.</p>

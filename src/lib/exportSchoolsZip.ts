@@ -49,30 +49,32 @@ export async function exportSchoolsAsZip(schoolIds: string[]) {
       const classStudents = allStudents.filter((s) => s.class_id === cls.id);
       const classAttendance = allAttendance.filter((a) => a.class_id === cls.id);
 
-      // Get unique dates sorted
-      const uniqueDates = [...new Set(classAttendance.map((a) => a.date))].sort();
+      // Build composite session keys (date|topic) to support multiple sessions per day
+      const sessionKeySet = new Set<string>();
+      classAttendance.forEach((a) => {
+        sessionKeySet.add(`${a.date}|${a.topic || ''}`);
+      });
+      const sessionKeys = [...sessionKeySet].sort();
 
       // Build date info headers
-      const dateHeaders = uniqueDates.map((d) => {
+      const dateHeaders = sessionKeys.map((k) => {
+        const d = k.split('|')[0];
         const parsed = parseISO(d);
         return format(parsed, 'dd/MM/yyyy');
       });
-      const dayHeaders = uniqueDates.map((d) => {
+      const dayHeaders = sessionKeys.map((k) => {
+        const d = k.split('|')[0];
         const parsed = parseISO(d);
         return DAY_NAMES[parsed.getDay()];
       });
-      // Get topic per date
-      const topicByDate: Record<string, string> = {};
-      classAttendance.forEach((a) => {
-        if (a.topic && !topicByDate[a.date]) topicByDate[a.date] = a.topic;
-      });
-      const topicHeaders = uniqueDates.map((d) => topicByDate[d] ?? '');
+      const topicHeaders = sessionKeys.map((k) => k.split('|')[1] || '');
 
-      // Build attendance lookup: student_id -> date -> status
+      // Build attendance lookup: student_id -> sessionKey -> status
       const statusMap: Record<string, Record<string, string>> = {};
       classAttendance.forEach((a) => {
+        const key = `${a.date}|${a.topic || ''}`;
         if (!statusMap[a.student_id]) statusMap[a.student_id] = {};
-        statusMap[a.student_id][a.date] = a.status;
+        statusMap[a.student_id][key] = a.status;
       });
 
       // Build rows
@@ -84,14 +86,17 @@ export async function exportSchoolsAsZip(schoolIds: string[]) {
       const header3 = ['', '', '', '', '', '', '', '', ...topicHeaders];
 
       const dataRows = classStudents.map((s) => {
-        const statuses = uniqueDates.map((d) => {
-          const st = statusMap[s.id]?.[d] ?? '';
+        const statuses = sessionKeys.map((k) => {
+          const st = statusMap[s.id]?.[k] ?? '';
           if (st === 'present') return 'P';
           if (st === 'absent') return 'A';
+          if (st === 'kit') return 'K';
+          if (st === 'quiz') return 'Q';
+          if (st === 'left') return 'L';
           return '';
         });
         const attended = statuses.filter((x) => x === 'P').length;
-        return [s.full_name, s.grade ?? '', s.div ?? '', s.parent_email_1 ?? '', s.parent_email_2 ?? '', s.parent_mobile_1 ?? '', s.parent_mobile_2 ?? '', `${attended} / ${uniqueDates.length}`, ...statuses];
+        return [s.full_name, s.grade ?? '', s.div ?? '', s.parent_email_1 ?? '', s.parent_email_2 ?? '', s.parent_mobile_1 ?? '', s.parent_mobile_2 ?? '', `${attended} / ${sessionKeys.length}`, ...statuses];
       });
 
       const sheetData = [titleRow, header1, header2, header3, ...dataRows];
@@ -107,7 +112,7 @@ export async function exportSchoolsAsZip(schoolIds: string[]) {
 
       const statusColStart = 8;
       const dataRowStart = 4; // shifted by 1 for title row
-      const totalCols = statusColStart + uniqueDates.length;
+      const totalCols = statusColStart + sessionKeys.length;
 
       // Style title row - merge across all columns
       sheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } }];
@@ -117,7 +122,7 @@ export async function exportSchoolsAsZip(schoolIds: string[]) {
 
       // Apply color coding to attendance status cells (P=green, A=red)
       for (let ri = 0; ri < dataRows.length; ri++) {
-        for (let ci = 0; ci < uniqueDates.length; ci++) {
+        for (let ci = 0; ci < sessionKeys.length; ci++) {
           const cellRef = XLSX.utils.encode_cell({ r: dataRowStart + ri, c: statusColStart + ci });
           const cell = sheet[cellRef];
           if (!cell) continue;
@@ -126,6 +131,10 @@ export async function exportSchoolsAsZip(schoolIds: string[]) {
             cell.s = { fill: { fgColor: { rgb: 'C6EFCE' } }, font: { color: { rgb: '006100' }, bold: true }, alignment: { horizontal: 'center' }, border: thinBorder };
           } else if (val === 'A') {
             cell.s = { fill: { fgColor: { rgb: 'FFC7CE' } }, font: { color: { rgb: '9C0006' }, bold: true }, alignment: { horizontal: 'center' }, border: thinBorder };
+          } else if (val === 'L') {
+            cell.s = { fill: { fgColor: { rgb: '8B0000' } }, font: { color: { rgb: 'FFFFFF' }, bold: true }, alignment: { horizontal: 'center' }, border: thinBorder };
+          } else if (val === 'K' || val === 'Q') {
+            cell.s = { fill: { fgColor: { rgb: 'BDD7EE' } }, font: { color: { rgb: '1F4E79' }, bold: true }, alignment: { horizontal: 'center' }, border: thinBorder };
           }
         }
         // Apply borders to non-status data cells in this row
@@ -147,7 +156,7 @@ export async function exportSchoolsAsZip(schoolIds: string[]) {
 
       sheet['!cols'] = [
         { wch: 25 }, { wch: 8 }, { wch: 8 }, { wch: 25 }, { wch: 25 }, { wch: 16 }, { wch: 16 }, { wch: 6 },
-        ...uniqueDates.map(() => ({ wch: 12 })),
+        ...sessionKeys.map(() => ({ wch: 12 })),
       ];
 
       // Use sequential sheet names: Sheet1, Sheet2, etc.
