@@ -19,6 +19,8 @@ import { exportToExcel } from '@/lib/exportExcel';
 import { exportToPdf } from '@/lib/exportPdf';
 import ExportDropdown from '@/components/ExportDropdown';
 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+
 type Status = 'present' | 'absent';
 
 const statusConfig: Record<Status, { label: string; icon: any; className: string }> = {
@@ -54,6 +56,9 @@ const Attendance = () => {
   const [topic, setTopic] = useState('');
   const [existingTopic, setExistingTopic] = useState('');
   const [activeTab, setActiveTab] = useState('mark');
+  const [changeDateOpen, setChangeDateOpen] = useState(false);
+  const [newDate, setNewDate] = useState<Date>(new Date());
+  const [changingDate, setChangingDate] = useState(false);
 
   // Records state
   const [attendanceMap, setAttendanceMap] = useState<Record<string, Record<string, Status>>>({});
@@ -205,6 +210,29 @@ const Attendance = () => {
     setSaving(false);
   };
 
+  const handleChangeDate = async () => {
+    if (!user || !filterClass) return;
+    const newDateStr = format(newDate, 'yyyy-MM-dd');
+    if (newDateStr === dateStr) { toast.info('Same date selected'); return; }
+    setChangingDate(true);
+
+    // Update all attendance records for this class+old date to new date
+    const { error } = await supabase
+      .from('attendance')
+      .update({ date: newDateStr })
+      .eq('class_id', filterClass)
+      .eq('date', dateStr);
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(`Attendance date changed to ${format(newDate, 'PPP')}`);
+      setSelectedDate(newDate);
+      setChangeDateOpen(false);
+    }
+    setChangingDate(false);
+  };
+
   const markAll = (status: Status) => {
     const updated: Record<string, Status> = {};
     filteredStudents.forEach(s => { updated[s.id] = status; });
@@ -315,17 +343,24 @@ const Attendance = () => {
               <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-foreground">Date</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn('w-[200px] justify-start text-left font-normal', !selectedDate && 'text-muted-foreground')}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {format(selectedDate, 'PPP')}
+                  <div className="flex items-center gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn('w-[200px] justify-start text-left font-normal', !selectedDate && 'text-muted-foreground')}>
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {format(selectedDate, 'PPP')}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={selectedDate} onSelect={(d) => d && setSelectedDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+                      </PopoverContent>
+                    </Popover>
+                    {Object.keys(existingAttendance).length > 0 && (
+                      <Button size="sm" variant="outline" onClick={() => { setNewDate(selectedDate); setChangeDateOpen(true); }}>
+                        Change Date
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={selectedDate} onSelect={(d) => d && setSelectedDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
-                    </PopoverContent>
-                  </Popover>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5 flex-1 min-w-0">
@@ -501,6 +536,39 @@ const Attendance = () => {
           </div>
         )}
       </div>
+
+      <Dialog open={changeDateOpen} onOpenChange={setChangeDateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Attendance Date</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Current date: <strong>{format(selectedDate, 'PPP')}</strong>
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">New Date</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal')}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(newDate, 'PPP')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={newDate} onSelect={(d) => d && setNewDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeDateOpen(false)}>Cancel</Button>
+            <Button onClick={handleChangeDate} disabled={changingDate}>
+              {changingDate ? 'Updating...' : 'Update Date'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
