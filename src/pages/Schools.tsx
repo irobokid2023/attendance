@@ -64,7 +64,7 @@ const Schools = () => {
       supabase.from('schools').select('*').order('created_at', { ascending: false }),
       supabase.from('classes').select('id, school_id, num_sessions'),
       supabase.from('students').select('id, class_id'),
-      supabase.from('attendance').select('class_id, date'),
+      supabase.from('attendance').select('class_id, date, topic'),
     ]);
     const schoolsData = schoolsRes.data ?? [];
     setSchools(schoolsData);
@@ -77,11 +77,11 @@ const Schools = () => {
     const classSchoolMap: Record<string, string> = {};
     classesData.forEach((c) => { classSchoolMap[c.id] = c.school_id; });
 
-    // Count unique dates per class for sessions conducted
+    // Count unique date|topic combinations per class for sessions conducted
     const classSessionsConducted: Record<string, Set<string>> = {};
-    attendanceData.forEach((a) => {
+    attendanceData.forEach((a: any) => {
       if (!classSessionsConducted[a.class_id]) classSessionsConducted[a.class_id] = new Set();
-      classSessionsConducted[a.class_id].add(a.date);
+      classSessionsConducted[a.class_id].add(`${a.date}|${a.topic || ''}`);
     });
 
     const stats: Record<string, { classes: number; students: number; sessionsConducted: number; totalSessions: number }> = {};

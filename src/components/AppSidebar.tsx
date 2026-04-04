@@ -11,6 +11,7 @@ import {
   LogOut,
   Settings,
   Menu,
+  MessageSquareText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -23,7 +24,7 @@ const navItems = [
   { to: '/classes', icon: BookOpen, label: 'Classes' },
   { to: '/students', icon: Users, label: 'Students' },
   { to: '/attendance', icon: ClipboardCheck, label: 'Attendance' },
-  
+  { to: '/topics', icon: MessageSquareText, label: 'Topic of the Day' },
   { to: '/grading', icon: Award, label: 'Grading' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/profile', icon: Settings, label: 'Profile' },

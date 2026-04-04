@@ -111,20 +111,20 @@ const Attendance = () => {
     const fetchAll = async () => {
       const [studentsRes, allAttendanceRes, dateAttendanceRes] = await Promise.all([
         supabase.from('students').select('*').eq('class_id', filterClass).order('full_name'),
-        supabase.from('attendance').select('student_id, date, status').eq('class_id', filterClass),
+        supabase.from('attendance').select('student_id, date, status, topic').eq('class_id', filterClass),
         supabase.from('attendance').select('student_id, status, topic').eq('class_id', filterClass).eq('date', dateStr),
       ]);
 
       setStudents(studentsRes.data ?? []);
 
-      // Session stats
+      // Session stats - count unique date|topic combinations
       const allRecords = allAttendanceRes.data ?? [];
-      const distinctDates = new Set(allRecords.map(r => r.date));
+      const distinctSessions = new Set(allRecords.map(r => `${r.date}|${(r as any).topic || ''}`));
       const perStudent: Record<string, number> = {};
       allRecords.forEach(r => {
         if (r.status === 'present') perStudent[r.student_id] = (perStudent[r.student_id] || 0) + 1;
       });
-      setSessionStats({ total: distinctDates.size, perStudent });
+      setSessionStats({ total: distinctSessions.size, perStudent });
 
       // Sessions for this date (grouped by topic)
       const dateRecords = dateAttendanceRes.data ?? [];

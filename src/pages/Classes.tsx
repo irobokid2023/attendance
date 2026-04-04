@@ -130,14 +130,14 @@ const Classes = () => {
     const [classesRes, schoolsRes, attendanceRes] = await Promise.all([
       supabase.from('classes').select('*, schools(name)').order('created_at', { ascending: false }),
       supabase.from('schools').select('id, name'),
-      supabase.from('attendance').select('class_id, date'),
+      supabase.from('attendance').select('class_id, date, topic'),
     ]);
     setClasses(classesRes.data ?? []);
     setSchools(schoolsRes.data ?? []);
     const counts: Record<string, Set<string>> = {};
-    (attendanceRes.data ?? []).forEach((r) => { if (!counts[r.class_id]) counts[r.class_id] = new Set(); counts[r.class_id].add(r.date); });
+    (attendanceRes.data ?? []).forEach((r: any) => { if (!counts[r.class_id]) counts[r.class_id] = new Set(); counts[r.class_id].add(`${r.date}|${r.topic || ''}`); });
     const result: Record<string, number> = {};
-    Object.entries(counts).forEach(([id, dates]) => { result[id] = dates.size; });
+    Object.entries(counts).forEach(([id, sessions]) => { result[id] = sessions.size; });
     setSessionCounts(result);
   };
 
@@ -255,7 +255,8 @@ const Classes = () => {
           'Electrics and Circuits (Snap Kit)',
           'Lego Robotics - Ev3',
           'Lego Robotics - NxT',
-          'Python Programming',
+           'Python Programming',
+           'Robotics and AI',
            'STEM Explorers',
            'Young Engineers',
         ].includes(form.name)) && form.name !== '' ? (
@@ -280,6 +281,7 @@ const Classes = () => {
               <SelectItem value="Lego Robotics - Ev3">Lego Robotics - Ev3</SelectItem>
               <SelectItem value="Lego Robotics - NxT">Lego Robotics - NxT</SelectItem>
               <SelectItem value="Python Programming">Python Programming</SelectItem>
+              <SelectItem value="Robotics and AI">Robotics and AI</SelectItem>
               <SelectItem value="STEM Explorers">STEM Explorers</SelectItem>
               <SelectItem value="Young Engineers">Young Engineers</SelectItem>
               <SelectItem value="__custom__">Custom</SelectItem>

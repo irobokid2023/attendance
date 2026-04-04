@@ -329,6 +329,41 @@ export type Database = {
           },
         ]
       }
+      topics: {
+        Row: {
+          class_id: string
+          created_at: string
+          created_by: string
+          date: string
+          id: string
+          topic: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          created_by: string
+          date?: string
+          id?: string
+          topic: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          created_by?: string
+          date?: string
+          id?: string
+          topic?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "topics_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
