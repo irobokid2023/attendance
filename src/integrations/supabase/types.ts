@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          description: string
+          id: string
+          metadata: Json | null
+          section: string
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          description: string
+          id?: string
+          metadata?: Json | null
+          section: string
+          user_id: string
+          user_name?: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string
+          id?: string
+          metadata?: Json | null
+          section?: string
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: []
+      }
       attendance: {
         Row: {
           class_id: string
@@ -169,6 +202,7 @@ export type Database = {
           created_by: string
           date: string
           description: string | null
+          end_date: string | null
           id: string
           name: string
           school_id: string
@@ -178,6 +212,7 @@ export type Database = {
           created_by: string
           date: string
           description?: string | null
+          end_date?: string | null
           id?: string
           name: string
           school_id: string
@@ -187,6 +222,7 @@ export type Database = {
           created_by?: string
           date?: string
           description?: string | null
+          end_date?: string | null
           id?: string
           name?: string
           school_id?: string

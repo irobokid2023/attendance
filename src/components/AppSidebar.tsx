@@ -12,6 +12,7 @@ import {
   Settings,
   Menu,
   MessageSquareText,
+  History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -27,6 +28,7 @@ const navItems = [
   { to: '/topics', icon: MessageSquareText, label: 'Topic of the Day' },
   { to: '/grading', icon: Award, label: 'Grading' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
+  { to: '/activity-log', icon: History, label: 'Activity Log' },
   { to: '/profile', icon: Settings, label: 'Profile' },
 ];
 

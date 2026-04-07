@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { capitalizeFields } from '@/lib/utils';
+import { logActivity } from '@/lib/activityLogger';
 import DashboardLayout from '@/components/DashboardLayout';
 import SearchFilterBar from '@/components/SearchFilterBar';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, BookOpen, School, Users, ArrowLeft, Trash2, Pencil, LayoutGrid, List, Clock } from 'lucide-react';
+import { Plus, BookOpen, School, Users, ArrowLeft, Trash2, Pencil, LayoutGrid, List, Clock, Copy } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { exportToExcel } from '@/lib/exportExcel';
 import { exportToPdf } from '@/lib/exportPdf';
@@ -125,12 +126,14 @@ const Classes = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [customDiv, setCustomDiv] = useState(false);
   const [customGrade, setCustomGrade] = useState(false);
+  const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
 
   const fetchData = async () => {
-    const [classesRes, schoolsRes, attendanceRes] = await Promise.all([
+    const [classesRes, schoolsRes, attendanceRes, studentsRes] = await Promise.all([
       supabase.from('classes').select('*, schools(name)').order('created_at', { ascending: false }),
       supabase.from('schools').select('id, name'),
       supabase.from('attendance').select('class_id, date, topic'),
+      supabase.from('students').select('id, class_id'),
     ]);
     setClasses(classesRes.data ?? []);
     setSchools(schoolsRes.data ?? []);
@@ -139,6 +142,9 @@ const Classes = () => {
     const result: Record<string, number> = {};
     Object.entries(counts).forEach(([id, sessions]) => { result[id] = sessions.size; });
     setSessionCounts(result);
+    const sCounts: Record<string, number> = {};
+    (studentsRes.data ?? []).forEach((s: any) => { sCounts[s.class_id] = (sCounts[s.class_id] || 0) + 1; });
+    setStudentCounts(sCounts);
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -199,11 +205,11 @@ const Classes = () => {
     if (editId) {
       const { error } = await supabase.from('classes').update(payload).eq('id', editId);
       if (error) toast.error(error.message);
-      else { toast.success('Class updated!'); setOpen(false); fetchData(); }
+      else { toast.success('Class updated!'); setOpen(false); fetchData(); logActivity({ action: 'updated', section: 'classes', description: `Updated class "${payload.name}"` }); }
     } else {
       const { error } = await supabase.from('classes').insert(payload);
       if (error) toast.error(error.message);
-      else { toast.success('Class added!'); setOpen(false); fetchData(); }
+      else { toast.success('Class added!'); setOpen(false); fetchData(); logActivity({ action: 'created', section: 'classes', description: `Created class "${payload.name}"` }); }
     }
     setLoading(false);
   };
@@ -216,17 +222,38 @@ const Classes = () => {
     const ids = Array.from(selected);
     const { error } = await supabase.from('classes').delete().in('id', ids);
     if (error) toast.error(error.message);
-    else { toast.success(`${ids.length} class(es) deleted`); setSelected(new Set()); fetchData(); }
+    else { toast.success(`${ids.length} class(es) deleted`); setSelected(new Set()); fetchData(); logActivity({ action: 'deleted', section: 'classes', description: `Deleted ${ids.length} class(es)` }); }
     setDeleting(false);
     setDeleteOpen(false);
   };
 
+  const handleDuplicate = async (cls: any) => {
+    const payload = {
+      name: cls.name,
+      school_id: cls.school_id,
+      day: cls.day,
+      timing: cls.timing,
+      num_sessions: cls.num_sessions ?? 0,
+      instructor_names: cls.instructor_names,
+      venue: cls.venue,
+      grade: cls.grade,
+      div: cls.div,
+    };
+    const { error } = await supabase.from('classes').insert(payload);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(`Class "${getClassName(cls)}" duplicated!`);
+      fetchData();
+      logActivity({ action: 'duplicated', section: 'classes', description: `Duplicated class "${getClassName(cls)}"` });
+    }
+  };
+
   const handleExport = () => {
     exportToExcel({ filename: 'classes.xlsx', sheetName: 'Classes', rows: filtered.map((c) => ({
-      'Class Name': getClassName(c), 'Program Name': c.name, School: c.schools?.name ?? '', Grade: c.grade ?? '', Division: c.div ?? '', Day: c.day ?? '', Timing: c.timing ?? '',
-      'No. of Sessions': c.num_sessions ?? 0, 'Sessions Conducted': sessionCounts[c.id] || 0,
-      Instructors: c.instructor_names ?? '', Venue: c.venue ?? '',
-    })) });
+       'Class Name': getClassName(c), 'Program Name': c.name, School: c.schools?.name ?? '', Grade: c.grade ?? '', Division: c.div ?? '', Day: c.day ?? '', Timing: c.timing ?? '',
+       'No. of Students': studentCounts[c.id] || 0, 'No. of Sessions': c.num_sessions ?? 0, 'Sessions Conducted': sessionCounts[c.id] || 0,
+       Instructors: c.instructor_names ?? '', Venue: c.venue ?? '',
+     })) });
   };
 
   const handleExportPdf = () => {
@@ -439,6 +466,7 @@ const Classes = () => {
                     {groupClasses.map((cls: any) => (
                       <Card key={cls.id} className="animate-fade-in hover:shadow-md transition-shadow cursor-pointer hover:border-primary/40 relative" onClick={() => handleSelectClass(cls.id)}>
                         <div className="absolute top-3 right-3 z-10 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Duplicate" onClick={() => handleDuplicate(cls)}><Copy className="w-3.5 h-3.5" /></Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(cls)}><Pencil className="w-3.5 h-3.5" /></Button>
                           <Checkbox checked={selected.has(cls.id)} onCheckedChange={() => toggleSelect(cls.id)} />
                         </div>
@@ -447,7 +475,7 @@ const Classes = () => {
                           <p className="text-sm text-muted-foreground">{cls.schools?.name ?? 'Unknown School'}</p>
                           {(cls.grade || cls.div) && <p className="text-xs text-muted-foreground mt-0.5">Grade: {cls.grade || '—'} • Div: {cls.div || '—'}</p>}
                           {cls.day && <p className="text-xs text-muted-foreground mt-0.5">{cls.day} {cls.timing ? `• ${cls.timing}` : ''}</p>}
-                          <p className="text-xs text-muted-foreground mt-1">Sessions conducted: <span className="font-semibold text-foreground">{sessionCounts[cls.id] || 0}</span>{cls.num_sessions ? ` / ${cls.num_sessions}` : ''}</p>
+                          <p className="text-xs text-muted-foreground mt-1">Students: <span className="font-semibold text-foreground">{studentCounts[cls.id] || 0}</span> • Sessions conducted: <span className="font-semibold text-foreground">{sessionCounts[cls.id] || 0}</span>{cls.num_sessions ? ` / ${cls.num_sessions}` : ''}</p>
                         </CardContent>
                       </Card>
                     ))}
@@ -466,9 +494,10 @@ const Classes = () => {
                     <TableHead>Grade</TableHead>
                     <TableHead>Div</TableHead>
                     <TableHead>Day</TableHead>
-                    <TableHead>Timing</TableHead>
-                    <TableHead>Sessions</TableHead>
-                    <TableHead className="w-20">Actions</TableHead>
+                     <TableHead>Timing</TableHead>
+                     <TableHead>Students</TableHead>
+                     <TableHead>Sessions</TableHead>
+                     <TableHead className="w-20">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -480,10 +509,14 @@ const Classes = () => {
                       <TableCell className="text-muted-foreground">{cls.grade || '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{cls.div || '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{cls.day || '—'}</TableCell>
-                      <TableCell className="text-muted-foreground">{cls.timing || '—'}</TableCell>
-                      <TableCell className="text-muted-foreground">{sessionCounts[cls.id] || 0}{cls.num_sessions ? ` / ${cls.num_sessions}` : ''}</TableCell>
+                       <TableCell className="text-muted-foreground">{cls.timing || '—'}</TableCell>
+                       <TableCell className="text-muted-foreground">{studentCounts[cls.id] || 0}</TableCell>
+                       <TableCell className="text-muted-foreground">{sessionCounts[cls.id] || 0}{cls.num_sessions ? ` / ${cls.num_sessions}` : ''}</TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(cls)}><Pencil className="w-3.5 h-3.5" /></Button>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Duplicate" onClick={() => handleDuplicate(cls)}><Copy className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(cls)}><Pencil className="w-3.5 h-3.5" /></Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

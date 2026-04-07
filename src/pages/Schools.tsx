@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { capitalizeFields } from '@/lib/utils';
+import { logActivity } from '@/lib/activityLogger';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
 import SearchFilterBar from '@/components/SearchFilterBar';
@@ -99,24 +100,29 @@ const Schools = () => {
 
   useEffect(() => { fetchSchools(); }, []);
 
+  const [classStudentCounts, setClassStudentCounts] = useState<Record<string, number>>({});
+
   const fetchClasses = useCallback(async (schoolId: string) => {
     setClassesLoading(true);
-    const [classesRes, attendanceRes] = await Promise.all([
+    const [classesRes, attendanceRes, studentsRes] = await Promise.all([
       supabase.from('classes').select('*').eq('school_id', schoolId).order('name', { ascending: true }),
-      supabase.from('attendance').select('class_id, date'),
+      supabase.from('attendance').select('class_id, date, topic'),
+      supabase.from('students').select('id, class_id'),
     ]);
     const classesData = classesRes.data ?? [];
     setClasses(classesData);
     
-    // Count unique dates per class
     const conducted: Record<string, Set<string>> = {};
-    (attendanceRes.data ?? []).forEach((a) => {
+    (attendanceRes.data ?? []).forEach((a: any) => {
       if (!conducted[a.class_id]) conducted[a.class_id] = new Set();
-      conducted[a.class_id].add(a.date);
+      conducted[a.class_id].add(`${a.date}|${a.topic || ''}`);
     });
     const conductedCounts: Record<string, number> = {};
-    Object.entries(conducted).forEach(([id, dates]) => { conductedCounts[id] = dates.size; });
+    Object.entries(conducted).forEach(([id, sessions]) => { conductedCounts[id] = sessions.size; });
     setClassSessionsConducted(conductedCounts);
+    const sCounts: Record<string, number> = {};
+    (studentsRes.data ?? []).forEach((s: any) => { sCounts[s.class_id] = (sCounts[s.class_id] || 0) + 1; });
+    setClassStudentCounts(sCounts);
     setClassesLoading(false);
   }, []);
 
@@ -170,11 +176,11 @@ const Schools = () => {
     if (editId) {
       const { error } = await supabase.from('schools').update(payload).eq('id', editId);
       if (error) toast.error(error.message);
-      else { toast.success('School updated!'); setOpen(false); fetchSchools(); }
+      else { toast.success('School updated!'); setOpen(false); fetchSchools(); logActivity({ action: 'updated', section: 'schools', description: `Updated school "${payload.name}"` }); }
     } else {
       const { error } = await supabase.from('schools').insert({ ...payload, created_by: user.id });
       if (error) toast.error(error.message);
-      else { toast.success('School added!'); setOpen(false); fetchSchools(); }
+      else { toast.success('School added!'); setOpen(false); fetchSchools(); logActivity({ action: 'created', section: 'schools', description: `Created school "${payload.name}"` }); }
     }
     setLoading(false);
   };
@@ -187,7 +193,7 @@ const Schools = () => {
     const ids = Array.from(selected);
     const { error } = await supabase.from('schools').delete().in('id', ids);
     if (error) toast.error(error.message);
-    else { toast.success(`${ids.length} school(s) deleted`); setSelected(new Set()); fetchSchools(); }
+    else { toast.success(`${ids.length} school(s) deleted`); setSelected(new Set()); fetchSchools(); logActivity({ action: 'deleted', section: 'schools', description: `Deleted ${ids.length} school(s)` }); }
     setDeleting(false);
     setDeleteOpen(false);
   };
@@ -373,18 +379,19 @@ const Schools = () => {
           <div className="text-center py-20"><BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">No classes in this school yet.</p></div>
         ) : (
           <Card><CardContent className="p-0">
-            <Table><TableHeader><TableRow><TableHead className="w-16">#</TableHead><TableHead>Class Name</TableHead><TableHead>Day</TableHead><TableHead>Timing</TableHead><TableHead>Instructor(s)</TableHead><TableHead>Venue</TableHead><TableHead>Sessions Conducted</TableHead></TableRow></TableHeader>
-              <TableBody>{classes.map((cls, i) => (
-                <TableRow key={cls.id}>
-                  <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                  <TableCell className="font-medium flex items-center gap-2"><BookOpen className="w-4 h-4 text-accent" />{cls.name}</TableCell>
-                  <TableCell>{cls.day || '—'}</TableCell>
-                  <TableCell>{cls.timing || '—'}</TableCell>
-                  <TableCell>{cls.instructor_names || '—'}</TableCell>
-                  <TableCell>{cls.venue || '—'}</TableCell>
-                  <TableCell>{classSessionsConducted[cls.id] ?? 0} / {cls.num_sessions ?? 0}</TableCell>
-                </TableRow>
-              ))}</TableBody></Table>
+             <Table><TableHeader><TableRow><TableHead className="w-16">#</TableHead><TableHead>Class Name</TableHead><TableHead>Day</TableHead><TableHead>Timing</TableHead><TableHead>Instructor(s)</TableHead><TableHead>Venue</TableHead><TableHead>Students</TableHead><TableHead>Sessions Conducted</TableHead></TableRow></TableHeader>
+               <TableBody>{classes.map((cls, i) => (
+                 <TableRow key={cls.id}>
+                   <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                   <TableCell className="font-medium flex items-center gap-2"><BookOpen className="w-4 h-4 text-accent" />{cls.name}</TableCell>
+                   <TableCell>{cls.day || '—'}</TableCell>
+                   <TableCell>{cls.timing || '—'}</TableCell>
+                   <TableCell>{cls.instructor_names || '—'}</TableCell>
+                   <TableCell>{cls.venue || '—'}</TableCell>
+                   <TableCell>{classStudentCounts[cls.id] ?? 0}</TableCell>
+                   <TableCell>{classSessionsConducted[cls.id] ?? 0} / {cls.num_sessions ?? 0}</TableCell>
+                 </TableRow>
+               ))}</TableBody></Table>
           </CardContent></Card>
         )}
       </DashboardLayout>

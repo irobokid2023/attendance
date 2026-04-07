@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { logActivity } from '@/lib/activityLogger';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -273,6 +274,8 @@ const Attendance = () => {
     if (error) toast.error(error.message);
     else {
       toast.success('Attendance saved!');
+      const cls = allClasses.find(c => c.id === filterClass);
+      logActivity({ action: selectedSession ? 'updated' : 'created', section: 'attendance', description: `${selectedSession ? 'Updated' : 'Marked'} attendance for ${cls ? getClassName(cls) : 'class'} on ${dateStr} - ${trimmedTopic}` });
       setSelectedSession(trimmedTopic);
       setIsNewSession(false);
       // Refresh sessions list

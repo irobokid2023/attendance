@@ -23,11 +23,11 @@ const HolidayImportDialog = ({ schools, userId, onImported }: HolidayImportDialo
   const fileRef = useRef<HTMLInputElement>(null);
 
   const downloadTemplate = () => {
-    const headers = ['Date', 'Event', 'Description'];
+    const headers = ['Start Date', 'End Date', 'Event', 'Description'];
     const sampleRows = [
-      ['2026-01-26', 'Republic Day', 'National holiday'],
-      ['2026-08-15', 'Independence Day', 'National holiday'],
-      ['2026-10-02', 'Gandhi Jayanti', ''],
+      ['2026-01-26', '2026-01-26', 'Republic Day', 'National holiday'],
+      ['2026-08-15', '2026-08-15', 'Independence Day', 'National holiday'],
+      ['2026-10-12', '2026-10-17', 'Dussehra Break', 'Festival holidays'],
     ];
     const data = [headers, ...sampleRows];
     const ws = XLSX.utils.aoa_to_sheet(data);
@@ -47,7 +47,7 @@ const HolidayImportDialog = ({ schools, userId, onImported }: HolidayImportDialo
       const ref = XLSX.utils.encode_cell({ r: 0, c: i });
       if (ws[ref]) ws[ref].s = headerStyle;
     }
-    ws['!cols'] = [{ wch: 15 }, { wch: 25 }, { wch: 35 }];
+    ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 35 }];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Holidays');
@@ -56,18 +56,14 @@ const HolidayImportDialog = ({ schools, userId, onImported }: HolidayImportDialo
 
   const parseDate = (value: any): string | null => {
     if (!value) return null;
-    // If it's a JS Date (Excel serial date parsed by XLSX)
     if (value instanceof Date && isValid(value)) {
       return format(value, 'yyyy-MM-dd');
     }
     const str = String(value).trim();
-    // Try yyyy-MM-dd
     const d1 = parse(str, 'yyyy-MM-dd', new Date());
     if (isValid(d1)) return format(d1, 'yyyy-MM-dd');
-    // Try dd-MM-yyyy
     const d2 = parse(str, 'dd-MM-yyyy', new Date());
     if (isValid(d2)) return format(d2, 'yyyy-MM-dd');
-    // Try dd/MM/yyyy
     const d3 = parse(str, 'dd/MM/yyyy', new Date());
     if (isValid(d3)) return format(d3, 'yyyy-MM-dd');
     return null;
@@ -95,21 +91,24 @@ const HolidayImportDialog = ({ schools, userId, onImported }: HolidayImportDialo
         return;
       }
 
-      const holidays: { name: string; date: string; school_id: string; description: string | null; created_by: string }[] = [];
+      const holidays: any[] = [];
       const errors: string[] = [];
 
       rows.forEach((row, idx) => {
         const event = String(row['Event'] || row['event'] || '').trim();
-        const dateRaw = row['Date'] || row['date'];
+        const startDateRaw = row['Start Date'] || row['start date'] || row['Date'] || row['date'];
+        const endDateRaw = row['End Date'] || row['end date'];
         const desc = String(row['Description'] || row['description'] || '').trim();
 
         if (!event) { errors.push(`Row ${idx + 2}: Missing event name`); return; }
-        const parsedDate = parseDate(dateRaw);
-        if (!parsedDate) { errors.push(`Row ${idx + 2}: Invalid date`); return; }
+        const parsedStart = parseDate(startDateRaw);
+        if (!parsedStart) { errors.push(`Row ${idx + 2}: Invalid start date`); return; }
+        const parsedEnd = parseDate(endDateRaw) || parsedStart;
 
         holidays.push(capitalizeFields({
           name: event,
-          date: parsedDate,
+          date: parsedStart,
+          end_date: parsedEnd,
           school_id: schoolId,
           description: desc || null,
           created_by: userId,
@@ -171,7 +170,7 @@ const HolidayImportDialog = ({ schools, userId, onImported }: HolidayImportDialo
           </div>
 
           <p className="text-xs text-muted-foreground">
-            File must have columns: <strong>Date</strong>, <strong>Event</strong>, <strong>Description</strong>. Supported date formats: yyyy-MM-dd, dd-MM-yyyy, dd/MM/yyyy.
+            File must have columns: <strong>Start Date</strong>, <strong>End Date</strong>, <strong>Event</strong>, <strong>Description</strong>. Supported date formats: yyyy-MM-dd, dd-MM-yyyy, dd/MM/yyyy.
           </p>
         </div>
       </DialogContent>

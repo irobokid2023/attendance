@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { logActivity } from '@/lib/activityLogger';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -142,6 +143,8 @@ const Grading = () => {
       const { error } = await supabase.from('grading').insert(rows);
       if (error) throw error;
       toast.success('Grading saved successfully');
+      const cls = allClasses.find(c => c.id === filterClass);
+      logActivity({ action: 'created', section: 'grading', description: `Saved grading for ${cls ? [cls.name, cls.grade, cls.div].filter(Boolean).join(' - ') : 'class'}` });
       setExistingGrading({ ...grading });
     } catch (err: any) {
       toast.error(err.message || 'Failed to save grading');

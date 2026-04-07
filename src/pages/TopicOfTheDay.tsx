@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { logActivity } from '@/lib/activityLogger';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -95,6 +96,8 @@ const TopicOfTheDay = () => {
         }
       } else {
         toast.success('Topic saved successfully!');
+        const cls = allClasses.find(c => c.id === filterClass);
+        logActivity({ action: 'created', section: 'topics', description: `Added topic for ${cls ? [cls.name, cls.grade, cls.div].filter(Boolean).join(' - ') : 'class'}` });
         setTopicText('');
       }
     } catch (err: any) {

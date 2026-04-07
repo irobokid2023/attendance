@@ -16,6 +16,7 @@ import TopicOfTheDay from "./pages/TopicOfTheDay";
 import HolidayCalendar from "./pages/HolidayCalendar";
 import Grading from "./pages/Grading";
 import Profile from "./pages/Profile";
+import ActivityLog from "./pages/ActivityLog";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/topics" element={<ProtectedRoute><TopicOfTheDay /></ProtectedRoute>} />
             <Route path="/calendar" element={<ProtectedRoute><HolidayCalendar /></ProtectedRoute>} />
             <Route path="/grading" element={<ProtectedRoute><Grading /></ProtectedRoute>} />
+            <Route path="/activity-log" element={<ProtectedRoute><ActivityLog /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

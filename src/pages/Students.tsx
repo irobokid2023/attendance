@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import XLSX from 'xlsx-js-style';
 import { capitalizeFields } from '@/lib/utils';
+import { logActivity } from '@/lib/activityLogger';
 import { supabase } from '@/integrations/supabase/client';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -156,10 +157,10 @@ const Students = () => {
     }, ['full_name']);
     if (editId) {
       const { error } = await supabase.from('students').update(payload).eq('id', editId);
-      if (error) toast.error(error.message); else { toast.success('Student updated!'); setOpen(false); filterClass ? fetchStudents(filterClass) : undefined; }
+      if (error) toast.error(error.message); else { toast.success('Student updated!'); setOpen(false); filterClass ? fetchStudents(filterClass) : undefined; logActivity({ action: 'updated', section: 'students', description: `Updated student "${payload.full_name}"` }); }
     } else {
       const { error } = await supabase.from('students').insert(payload);
-      if (error) toast.error(error.message); else { toast.success('Student added!'); setOpen(false); filterClass ? fetchStudents(filterClass) : undefined; }
+      if (error) toast.error(error.message); else { toast.success('Student added!'); setOpen(false); filterClass ? fetchStudents(filterClass) : undefined; logActivity({ action: 'created', section: 'students', description: `Added student "${payload.full_name}"` }); }
     }
     setLoading(false);
   };
@@ -171,7 +172,7 @@ const Students = () => {
     setDeleting(true);
     const ids = Array.from(selected);
     const { error } = await supabase.from('students').delete().in('id', ids);
-    if (error) toast.error(error.message); else { toast.success(`${ids.length} student(s) deleted`); setSelected(new Set()); filterClass ? fetchStudents(filterClass) : undefined; }
+    if (error) toast.error(error.message); else { toast.success(`${ids.length} student(s) deleted`); setSelected(new Set()); filterClass ? fetchStudents(filterClass) : undefined; logActivity({ action: 'deleted', section: 'students', description: `Deleted ${ids.length} student(s)` }); }
     setDeleting(false); setDeleteOpen(false);
   };
 
@@ -244,7 +245,7 @@ const Students = () => {
 
     const { error } = await supabase.from('students').insert(rows);
     if (error) { toast.error(error.message); }
-    else { toast.success(`${rows.length} student(s) imported successfully!`); setImportOpen(false); setImportData(null); setImportClassId(''); filterClass ? fetchStudents(filterClass) : undefined; }
+    else { toast.success(`${rows.length} student(s) imported successfully!`); setImportOpen(false); setImportData(null); setImportClassId(''); filterClass ? fetchStudents(filterClass) : undefined; logActivity({ action: 'imported', section: 'students', description: `Imported ${rows.length} student(s)` }); }
     setImporting(false);
   };
 
