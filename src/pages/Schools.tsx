@@ -13,9 +13,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, School, BookOpen, Users, ArrowLeft, Trash2, Pencil, LayoutGrid, List, Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { exportSchoolsAsZip } from '@/lib/exportSchoolsZip';
+import { getSchoolColor } from '@/lib/colorCoding';
 import { exportToPdf } from '@/lib/exportPdf';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -280,7 +282,7 @@ const Schools = () => {
               if (st === 'left') return 'L';
               return '';
             });
-            const attended = statuses.filter(x => x === 'P').length;
+            const attended = statuses.filter(x => x === 'P' || x === 'K' || x === 'Q').length;
             htmlContent += `<tr><td style="border:1px solid #ccc;padding:3px 5px;">${s.full_name}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;">${s.grade ?? ''}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;">${s.div ?? ''}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;font-weight:bold;">${attended}/${sessionKeys.length}</td>`;
             for (const st of statuses) {
               let bg = '';
@@ -460,12 +462,12 @@ const Schools = () => {
           {viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((school) => (
-                <Card key={school.id} className="animate-fade-in hover:shadow-md transition-shadow cursor-pointer hover:border-primary/40 relative" onClick={() => handleSelectSchool(school.id)}>
+                <Card key={school.id} className={cn("animate-fade-in hover:shadow-md transition-shadow cursor-pointer relative border-l-4", getSchoolColor(school.name).border)} onClick={() => handleSelectSchool(school.id)}>
                   <div className="absolute top-3 right-3 z-10 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(school)}><Pencil className="w-3.5 h-3.5" /></Button>
                     <Checkbox checked={selected.has(school.id)} onCheckedChange={() => toggleSelect(school.id)} />
                   </div>
-                  <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><School className="w-4 h-4 text-primary" />{school.name}</CardTitle></CardHeader>
+                  <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><div className={cn("w-2.5 h-2.5 rounded-full", getSchoolColor(school.name).dot)} /><School className="w-4 h-4 text-primary" />{school.name}</CardTitle></CardHeader>
                    <CardContent>
                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
                        <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{schoolStats[school.id]?.classes ?? 0} classes</span>
@@ -493,7 +495,7 @@ const Schools = () => {
                   {filtered.map((school) => (
                     <TableRow key={school.id} className="cursor-pointer" onClick={() => handleSelectSchool(school.id)}>
                       <TableCell onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(school.id)} onCheckedChange={() => toggleSelect(school.id)} /></TableCell>
-                      <TableCell className="font-medium"><div className="flex items-center gap-2"><School className="w-4 h-4 text-primary" />{school.name}</div></TableCell>
+                      <TableCell className="font-medium"><div className="flex items-center gap-2"><div className={cn("w-2.5 h-2.5 rounded-full shrink-0", getSchoolColor(school.name).dot)} /><School className="w-4 h-4 text-primary" />{school.name}</div></TableCell>
                        <TableCell className="text-muted-foreground">{schoolStats[school.id]?.classes ?? 0}</TableCell>
                        <TableCell className="text-muted-foreground">{schoolStats[school.id]?.students ?? 0}</TableCell>
                        <TableCell className="text-muted-foreground">{(school.days ?? []).length > 0 ? (school.days as string[]).map((d: string) => d.slice(0, 3)).join(', ') : '—'}</TableCell>

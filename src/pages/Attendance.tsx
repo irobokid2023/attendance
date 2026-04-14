@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { isAttended } from '@/lib/attendanceUtils';
 import { logActivity } from '@/lib/activityLogger';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -123,7 +124,7 @@ const Attendance = () => {
       const distinctSessions = new Set(allRecords.map(r => `${r.date}|${(r as any).topic || ''}`));
       const perStudent: Record<string, number> = {};
       allRecords.forEach(r => {
-        if (r.status === 'present') perStudent[r.student_id] = (perStudent[r.student_id] || 0) + 1;
+        if (isAttended(r.status)) perStudent[r.student_id] = (perStudent[r.student_id] || 0) + 1;
       });
       setSessionStats({ total: distinctSessions.size, perStudent });
 
@@ -357,7 +358,7 @@ const Attendance = () => {
   const handleRecordsExportExcel = () => {
     const rows = filteredStudents.map(s => {
       const rec = attendanceMap[s.id] || {};
-      const attended = sessionKeys.filter(k => rec[k] === 'present').length;
+      const attended = sessionKeys.filter(k => isAttended(rec[k])).length;
       const row: Record<string, any> = { 'Student Name': s.full_name, 'Total': `${attended}/${sessionKeys.length}` };
       sessionKeys.forEach(k => {
         const info = sessionInfoMap[k];
@@ -373,7 +374,7 @@ const Attendance = () => {
     const headers = ['Student', 'Total', ...sessionKeys.map(k => { const info = sessionInfoMap[k]; return `${formatDate(info.date)}${info.topic ? '\n' + info.topic : ''}`; })];
     const rows = filteredStudents.map(s => {
       const rec = attendanceMap[s.id] || {};
-      const attended = sessionKeys.filter(k => rec[k] === 'present').length;
+      const attended = sessionKeys.filter(k => isAttended(rec[k])).length;
       return [s.full_name, `${attended}/${sessionKeys.length}`, ...sessionKeys.map(k => rec[k] ? recordStatusConfig[rec[k]].label : '-')];
     });
     exportToPdf({ title: 'Attendance Records', headers, rows, filename: 'attendance_records.pdf' });
@@ -592,7 +593,7 @@ const Attendance = () => {
                           <TableBody>
                             {filteredStudents.map((s, i) => {
                               const studentRecords = attendanceMap[s.id] || {};
-                              const attended = sessionKeys.filter(k => studentRecords[k] === 'present').length;
+                              const attended = sessionKeys.filter(k => isAttended(studentRecords[k])).length;
                               return (
                                 <TableRow key={s.id}>
                                   <TableCell className="text-muted-foreground sticky left-0 bg-card z-10">{i + 1}</TableCell>

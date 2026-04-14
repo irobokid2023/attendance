@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isAttended } from '@/lib/attendanceUtils';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -103,7 +104,7 @@ const Records = () => {
   const handleExportExcel = () => {
     const rows = filteredStudents.map(s => {
       const rec = attendanceMap[s.id] || {};
-      const attended = sessionDates.filter(d => rec[d] === 'present').length;
+      const attended = sessionDates.filter(d => isAttended(rec[d])).length;
       const row: Record<string, any> = { 'Student Name': s.full_name, 'Total': `${attended}/${sessionDates.length}` };
       sessionDates.forEach(d => { row[`${formatDate(d)} (${getDayName(d)})`] = rec[d] === 'present' ? 'P' : rec[d] === 'absent' ? 'A' : '-'; });
       return row;
@@ -115,7 +116,7 @@ const Records = () => {
     const headers = ['Student', 'Total', ...sessionDates.map(d => `${formatDate(d)}`)];
     const rows = filteredStudents.map(s => {
       const rec = attendanceMap[s.id] || {};
-      const attended = sessionDates.filter(d => rec[d] === 'present').length;
+      const attended = sessionDates.filter(d => isAttended(rec[d])).length;
       return [s.full_name, `${attended}/${sessionDates.length}`, ...sessionDates.map(d => rec[d] === 'present' ? 'P' : rec[d] === 'absent' ? 'A' : '-')];
     });
     exportToPdf({ title: 'Attendance Records', headers, rows, filename: 'attendance_records.pdf' });
@@ -193,7 +194,7 @@ const Records = () => {
                   <TableBody>
                     {filteredStudents.map((s, i) => {
                       const studentRecords = attendanceMap[s.id] || {};
-                      const attended = sessionDates.filter(d => studentRecords[d] === 'present').length;
+                      const attended = sessionDates.filter(d => isAttended(studentRecords[d])).length;
                       return (
                         <TableRow key={s.id}>
                           <TableCell className="text-muted-foreground sticky left-0 bg-card z-10">{i + 1}</TableCell>

@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Plus, BookOpen, School, Users, ArrowLeft, Trash2, Pencil, LayoutGrid, List, Clock, Copy } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { getSchoolColor } from '@/lib/colorCoding';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { exportToExcel } from '@/lib/exportExcel';
 import { exportToPdf } from '@/lib/exportPdf';
@@ -464,13 +466,13 @@ const Classes = () => {
                   <div className="flex items-center gap-2 mb-4"><School className="w-4.5 h-4.5 text-primary" /><h2 className="text-lg font-heading font-semibold text-foreground">{schoolName}</h2><span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{groupClasses.length}</span></div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {groupClasses.map((cls: any) => (
-                      <Card key={cls.id} className="animate-fade-in hover:shadow-md transition-shadow cursor-pointer hover:border-primary/40 relative" onClick={() => handleSelectClass(cls.id)}>
+                      <Card key={cls.id} className={cn("animate-fade-in hover:shadow-md transition-shadow cursor-pointer relative border-l-4", getSchoolColor(cls.schools?.name || cls.name).border)} onClick={() => handleSelectClass(cls.id)}>
                         <div className="absolute top-3 right-3 z-10 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Duplicate" onClick={() => handleDuplicate(cls)}><Copy className="w-3.5 h-3.5" /></Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(cls)}><Pencil className="w-3.5 h-3.5" /></Button>
                           <Checkbox checked={selected.has(cls.id)} onCheckedChange={() => toggleSelect(cls.id)} />
                         </div>
-                        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><BookOpen className="w-4 h-4 text-accent" />{getClassName(cls)}</CardTitle></CardHeader>
+                        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><div className={cn("w-2.5 h-2.5 rounded-full shrink-0", getSchoolColor(cls.schools?.name || cls.name).dot)} /><BookOpen className="w-4 h-4 text-accent" />{getClassName(cls)}</CardTitle></CardHeader>
                         <CardContent>
                           <p className="text-sm text-muted-foreground">{cls.schools?.name ?? 'Unknown School'}</p>
                           {(cls.grade || cls.div) && <p className="text-xs text-muted-foreground mt-0.5">Grade: {cls.grade || '—'} • Div: {cls.div || '—'}</p>}
@@ -504,7 +506,7 @@ const Classes = () => {
                   {filtered.map((cls) => (
                     <TableRow key={cls.id} className="cursor-pointer" onClick={() => handleSelectClass(cls.id)}>
                       <TableCell onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(cls.id)} onCheckedChange={() => toggleSelect(cls.id)} /></TableCell>
-                      <TableCell className="font-medium"><div className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-accent" />{getClassName(cls)}</div></TableCell>
+                      <TableCell className="font-medium"><div className="flex items-center gap-2"><div className={cn("w-2.5 h-2.5 rounded-full shrink-0", getSchoolColor(cls.schools?.name || cls.name).dot)} /><BookOpen className="w-4 h-4 text-accent" />{getClassName(cls)}</div></TableCell>
                       <TableCell className="text-muted-foreground">{cls.schools?.name ?? '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{cls.grade || '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{cls.div || '—'}</TableCell>

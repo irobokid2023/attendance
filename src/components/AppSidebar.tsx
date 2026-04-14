@@ -8,15 +8,15 @@ import {
   ClipboardCheck,
   CalendarDays,
   Award,
-  LogOut,
-  Settings,
   Menu,
   MessageSquareText,
   History,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import UserAvatar from '@/components/UserAvatar';
 import { useState, useEffect } from 'react';
 
 const navItems = [
@@ -37,15 +37,17 @@ const SidebarContent = ({ user, signOut, onNavClick }: { user: any; signOut: () 
 
   return (
     <div className="h-full flex flex-col bg-sidebar">
-      <div className="p-5 flex items-center gap-3">
-        <img src="/logo.ico" alt="iRobokid" className="w-9 h-9 rounded-xl" />
+      {/* Brand */}
+      <div className="p-5 pb-6 flex items-center gap-3 border-b border-sidebar-border">
+        <img src="/logo.ico" alt="iRobokid" className="w-9 h-9 rounded-xl shadow-md" />
         <div>
-          <h2 className="font-heading font-bold text-sidebar-primary-foreground text-base leading-tight">iRobokid</h2>
-          <span className="text-xs text-sidebar-foreground">Instructor</span>
+          <h2 className="font-heading font-bold text-sidebar-primary-foreground text-base leading-tight tracking-tight">iRobokid</h2>
+          <span className="text-[11px] text-sidebar-foreground/70 uppercase tracking-wider font-medium">Instructor</span>
         </div>
       </div>
 
-      <nav className="flex-1 px-3 mt-4 space-y-1">
+      {/* Navigation */}
+      <nav className="flex-1 px-3 mt-5 space-y-0.5 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to;
           return (
@@ -54,35 +56,27 @@ const SidebarContent = ({ user, signOut, onNavClick }: { user: any; signOut: () 
               to={to}
               onClick={onNavClick}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                'group flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200',
                 isActive
-                  ? 'bg-sidebar-accent text-sidebar-primary'
+                  ? 'bg-sidebar-primary/15 text-sidebar-primary shadow-sm'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
-              <Icon className="w-4.5 h-4.5" />
+              <Icon className={cn('w-[18px] h-[18px] transition-colors', isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-accent-foreground')} />
               {label}
             </NavLink>
           );
         })}
       </nav>
 
+      {/* User footer */}
       <div className="p-3 border-t border-sidebar-border">
-        <div className="flex items-center gap-3 px-3 py-2 mb-2">
-          <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-xs font-bold text-sidebar-accent-foreground">
-            {user?.email?.charAt(0).toUpperCase()}
-          </div>
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/50 transition-colors">
+          <UserAvatar name={null} email={user?.email} size="sm" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-sidebar-foreground truncate">{user?.email}</p>
+            <p className="text-xs text-sidebar-foreground/80 truncate">{user?.email}</p>
           </div>
         </div>
-        <button
-          onClick={signOut}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors w-full"
-        >
-          <LogOut className="w-4 h-4" />
-          Sign Out
-        </button>
       </div>
     </div>
   );
@@ -101,7 +95,7 @@ const AppSidebar = () => {
       <>
         <button
           onClick={() => setOpen(true)}
-          className="fixed top-4 left-4 z-50 w-10 h-10 rounded-lg bg-sidebar flex items-center justify-center text-sidebar-primary-foreground shadow-lg"
+          className="fixed top-4 left-4 z-50 w-10 h-10 rounded-lg bg-sidebar flex items-center justify-center text-sidebar-primary-foreground shadow-lg active:scale-95 transition-transform"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -115,7 +109,7 @@ const AppSidebar = () => {
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 z-50">
+    <aside className="fixed left-0 top-0 h-screen w-64 z-50 shadow-xl">
       <SidebarContent user={user} signOut={signOut} />
     </aside>
   );

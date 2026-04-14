@@ -95,7 +95,7 @@ export async function exportSchoolsAsZip(schoolIds: string[]) {
           if (st === 'left') return 'L';
           return '';
         });
-        const attended = statuses.filter((x) => x === 'P').length;
+        const attended = statuses.filter((x) => x === 'P' || x === 'K' || x === 'Q').length;
         return [s.full_name, s.grade ?? '', s.div ?? '', s.parent_email_1 ?? '', s.parent_email_2 ?? '', s.parent_mobile_1 ?? '', s.parent_mobile_2 ?? '', `${attended} / ${sessionKeys.length}`, ...statuses];
       });
 

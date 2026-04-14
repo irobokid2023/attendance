@@ -42,13 +42,13 @@
 
     --radius: 0.75rem;
 
-    --sidebar-background: 220 20% 10%;
-    --sidebar-foreground: 210 18% 82%;
+    --sidebar-background: 220 25% 10%;
+    --sidebar-foreground: 210 18% 72%;
     --sidebar-primary: 172 66% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 18% 16%;
+    --sidebar-accent: 220 20% 15%;
     --sidebar-accent-foreground: 210 18% 90%;
-    --sidebar-border: 220 18% 18%;
+    --sidebar-border: 220 20% 16%;
     --sidebar-ring: 172 66% 50%;
 
     --font-heading: 'Space Grotesk', sans-serif;
@@ -83,7 +83,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-family: var(--font-body);
   }
   h1, h2, h3, h4, h5, h6 {
@@ -93,7 +93,7 @@
 
 @layer components {
   .stat-card {
-    @apply bg-card rounded-xl border p-5 shadow-sm transition-all duration-200 hover:shadow-md;
+    @apply bg-card rounded-xl border p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5;
   }
   .page-header {
     @apply mb-8;
@@ -104,5 +104,31 @@
   }
   .page-subtitle {
     @apply text-sm text-muted-foreground mt-1;
+  }
+
+  /* Glassmorphism cards */
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-sm rounded-xl border shadow-sm;
+  }
+
+  /* Subtle gradient overlays */
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.08), hsl(var(--primary) / 0.02));
+  }
+
+  /* Smooth scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.2);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.35);
   }
 }
