@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllAttendanceSessions, fetchAllPaginated } from '@/lib/fetchAllAttendance';
 import { capitalizeFields } from '@/lib/utils';
 import { logActivity } from '@/lib/activityLogger';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -131,21 +132,21 @@ const Classes = () => {
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
 
   const fetchData = async () => {
-    const [classesRes, schoolsRes, attendanceRes, studentsRes] = await Promise.all([
+    const [classesRes, schoolsRes, attendanceRows, allStudents] = await Promise.all([
       supabase.from('classes').select('*, schools(name)').order('created_at', { ascending: false }),
       supabase.from('schools').select('id, name'),
-      supabase.from('attendance').select('class_id, date, topic'),
-      supabase.from('students').select('id, class_id'),
+      fetchAllAttendanceSessions(),
+      fetchAllPaginated<{ id: string; class_id: string }>(() => supabase.from('students').select('id, class_id')),
     ]);
     setClasses(classesRes.data ?? []);
     setSchools(schoolsRes.data ?? []);
     const counts: Record<string, Set<string>> = {};
-    (attendanceRes.data ?? []).forEach((r: any) => { if (!counts[r.class_id]) counts[r.class_id] = new Set(); counts[r.class_id].add(`${r.date}|${r.topic || ''}`); });
+    attendanceRows.forEach((r: any) => { if (!counts[r.class_id]) counts[r.class_id] = new Set(); counts[r.class_id].add(`${r.date}|${r.topic || ''}`); });
     const result: Record<string, number> = {};
     Object.entries(counts).forEach(([id, sessions]) => { result[id] = sessions.size; });
     setSessionCounts(result);
     const sCounts: Record<string, number> = {};
-    (studentsRes.data ?? []).forEach((s: any) => { sCounts[s.class_id] = (sCounts[s.class_id] || 0) + 1; });
+    allStudents.forEach((s) => { sCounts[s.class_id] = (sCounts[s.class_id] || 0) + 1; });
     setStudentCounts(sCounts);
   };
 

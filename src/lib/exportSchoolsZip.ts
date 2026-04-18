@@ -1,22 +1,21 @@
 import XLSX from 'xlsx-js-style';
 import JSZip from 'jszip';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPaginated } from '@/lib/fetchAllAttendance';
 import { format, parseISO } from 'date-fns';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export async function exportSchoolsAsZip(schoolIds: string[]) {
-  const [schoolsRes, classesRes, studentsRes, attendanceRes] = await Promise.all([
+  const [schoolsRes, classesRes, allStudents, allAttendance] = await Promise.all([
     supabase.from('schools').select('*').in('id', schoolIds),
     supabase.from('classes').select('*').in('school_id', schoolIds),
-    supabase.from('students').select('*'),
-    supabase.from('attendance').select('*'),
+    fetchAllPaginated<any>(() => supabase.from('students').select('*')),
+    fetchAllPaginated<any>(() => supabase.from('attendance').select('*')),
   ]);
 
   const schools = schoolsRes.data ?? [];
   const allClasses = classesRes.data ?? [];
-  const allStudents = studentsRes.data ?? [];
-  const allAttendance = attendanceRes.data ?? [];
 
   const classSchoolMap: Record<string, string> = {};
   allClasses.forEach((c) => { classSchoolMap[c.id] = c.school_id; });

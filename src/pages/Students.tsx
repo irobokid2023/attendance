@@ -3,6 +3,7 @@ import XLSX from 'xlsx-js-style';
 import { capitalizeFields } from '@/lib/utils';
 import { logActivity } from '@/lib/activityLogger';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPaginated } from '@/lib/fetchAllAttendance';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,8 +82,10 @@ const Students = () => {
   };
 
   const fetchStudents = async (classId: string) => {
-    const { data } = await supabase.from('students').select('*, classes(name, schools(name))').eq('class_id', classId).order('full_name');
-    setStudents(data ?? []);
+    const data = await fetchAllPaginated<any>(() =>
+      supabase.from('students').select('*, classes(name, schools(name))').eq('class_id', classId).order('full_name'),
+    );
+    setStudents(data);
   };
 
   useEffect(() => { fetchMeta(); }, []);

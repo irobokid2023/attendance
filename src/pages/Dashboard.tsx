@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPaginated } from '@/lib/fetchAllAttendance';
 import { isAttended } from '@/lib/attendanceUtils';
 import DashboardLayout from '@/components/DashboardLayout';
 import OnboardingTour from '@/components/OnboardingTour';
@@ -29,16 +30,17 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchAll = async () => {
       const today = new Date().toISOString().split('T')[0];
-      const [schoolsRes, classesRes, studentsRes, attendanceRes] = await Promise.all([
+      const [schoolsRes, classesRes, studentsRes, att] = await Promise.all([
         supabase.from('schools').select('id, name', { count: 'exact' }),
         supabase.from('classes').select('id, name, school_id, grade, div', { count: 'exact' }),
         supabase.from('students').select('id, class_id', { count: 'exact' }),
-        supabase.from('attendance').select('status, date, class_id, student_id'),
+        fetchAllPaginated<{ status: string; date: string; class_id: string; student_id: string }>(
+          () => supabase.from('attendance').select('status, date, class_id, student_id'),
+        ),
       ]);
 
       const schools = schoolsRes.data ?? [];
       const classes = classesRes.data ?? [];
-      const att = attendanceRes.data ?? [];
 
       const todayAtt = att.filter(a => a.date === today);
       setStats({

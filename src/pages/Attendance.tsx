@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPaginated } from '@/lib/fetchAllAttendance';
 import { useAuth } from '@/hooks/useAuth';
 import { isAttended } from '@/lib/attendanceUtils';
 import { logActivity } from '@/lib/activityLogger';
@@ -14,13 +15,14 @@ import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { ClipboardCheck, Check, X, Calendar as CalendarIcon, FileText, Package, HelpCircle, LogOut, Plus } from 'lucide-react';
+import { ClipboardCheck, Check, X, Calendar as CalendarIcon, FileText, Package, HelpCircle, LogOut, Plus, PartyPopper } from 'lucide-react';
 import { cn, capitalizeWords } from '@/lib/utils';
 import { format } from 'date-fns';
 import { exportToExcel } from '@/lib/exportExcel';
 import { exportToPdf } from '@/lib/exportPdf';
 import ExportDropdown from '@/components/ExportDropdown';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 type Status = 'present' | 'absent' | 'kit' | 'quiz' | 'left';
 
@@ -66,7 +68,7 @@ const Attendance = () => {
   const [changeDateOpen, setChangeDateOpen] = useState(false);
   const [newDate, setNewDate] = useState<Date>(new Date());
   const [changingDate, setChangingDate] = useState(false);
-
+  const [holidayMatch, setHolidayMatch] = useState<{ name: string; description: string | null } | null>(null);
   // Multiple sessions per day
   const [existingSessions, setExistingSessions] = useState<string[]>([]); // list of topics for date
   const [selectedSession, setSelectedSession] = useState<string | null>(null); // topic of session being edited, null = new
@@ -78,6 +80,24 @@ const Attendance = () => {
   const [sessionInfoMap, setSessionInfoMap] = useState<Record<string, { date: string; topic: string }>>({});
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
+
+  // Check if selected date is a holiday for the selected school
+  useEffect(() => {
+    if (!filterSchool || !dateStr) { setHolidayMatch(null); return; }
+    const check = async () => {
+      const { data } = await supabase
+        .from('holidays')
+        .select('name, description, date, end_date')
+        .eq('school_id', filterSchool);
+      const match = (data ?? []).find(h => {
+        const start = h.date;
+        const end = h.end_date || h.date;
+        return dateStr >= start && dateStr <= end;
+      });
+      setHolidayMatch(match ? { name: match.name, description: match.description } : null);
+    };
+    check();
+  }, [filterSchool, dateStr]);
 
   useEffect(() => {
     Promise.all([
@@ -111,16 +131,17 @@ const Attendance = () => {
     }
 
     const fetchAll = async () => {
-      const [studentsRes, allAttendanceRes, dateAttendanceRes] = await Promise.all([
+      const [studentsRes, allRecords, dateAttendanceRes] = await Promise.all([
         supabase.from('students').select('*').eq('class_id', filterClass).order('full_name'),
-        supabase.from('attendance').select('student_id, date, status, topic').eq('class_id', filterClass),
+        fetchAllPaginated<{ student_id: string; date: string; status: string; topic: string | null }>(
+          () => supabase.from('attendance').select('student_id, date, status, topic').eq('class_id', filterClass),
+        ),
         supabase.from('attendance').select('student_id, status, topic').eq('class_id', filterClass).eq('date', dateStr),
       ]);
 
       setStudents(studentsRes.data ?? []);
 
       // Session stats - count unique date|topic combinations
-      const allRecords = allAttendanceRes.data ?? [];
       const distinctSessions = new Set(allRecords.map(r => `${r.date}|${(r as any).topic || ''}`));
       const perStudent: Record<string, number> = {};
       allRecords.forEach(r => {
@@ -187,14 +208,14 @@ const Attendance = () => {
     if (activeTab !== 'records' || !filterClass) { setAttendanceMap({}); setSessionKeys([]); setSessionInfoMap({}); return; }
 
     const fetchRecords = async () => {
-      const [studentsRes, attendanceRes] = await Promise.all([
+      const [studentsRes, records] = await Promise.all([
         supabase.from('students').select('*').eq('class_id', filterClass).order('full_name'),
-        supabase.from('attendance').select('student_id, date, status, topic').eq('class_id', filterClass).order('date', { ascending: false }),
+        fetchAllPaginated<{ student_id: string; date: string; status: string; topic: string | null }>(
+          () => supabase.from('attendance').select('student_id, date, status, topic').eq('class_id', filterClass).order('date', { ascending: false }),
+        ),
       ]);
 
       setStudents(studentsRes.data ?? []);
-
-      const records = attendanceRes.data ?? [];
       // Build composite keys: "date|topic"
       const keySet = new Set<string>();
       const infoMap: Record<string, { date: string; topic: string }> = {};
@@ -426,6 +447,15 @@ const Attendance = () => {
 
             {/* ===== MARK ATTENDANCE TAB ===== */}
             <TabsContent value="mark" className="space-y-4">
+              {holidayMatch && (
+                <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+                  <PartyPopper className="h-5 w-5 text-amber-600" />
+                  <AlertTitle className="text-amber-800 dark:text-amber-400">Holiday: {holidayMatch.name}</AlertTitle>
+                  <AlertDescription className="text-amber-700 dark:text-amber-500">
+                    {holidayMatch.description || 'This date is marked as a holiday for the selected school.'} You can still mark attendance if needed.
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-foreground">Date</label>

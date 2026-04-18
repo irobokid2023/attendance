@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllAttendanceSessions, fetchAllPaginated } from '@/lib/fetchAllAttendance';
 import { capitalizeFields } from '@/lib/utils';
 import { logActivity } from '@/lib/activityLogger';
 import { useAuth } from '@/hooks/useAuth';
@@ -63,18 +64,18 @@ const Schools = () => {
   const [schoolStats, setSchoolStats] = useState<Record<string, { classes: number; students: number; sessionsConducted: number; totalSessions: number }>>({});
 
   const fetchSchools = async () => {
-    const [schoolsRes, classesRes, studentsRes, attendanceRes] = await Promise.all([
+    const [schoolsRes, classesRes, studentsRes, attendanceRows] = await Promise.all([
       supabase.from('schools').select('*').order('created_at', { ascending: false }),
       supabase.from('classes').select('id, school_id, num_sessions'),
       supabase.from('students').select('id, class_id'),
-      supabase.from('attendance').select('class_id, date, topic'),
+      fetchAllAttendanceSessions(),
     ]);
     const schoolsData = schoolsRes.data ?? [];
     setSchools(schoolsData);
 
     const classesData = classesRes.data ?? [];
     const studentsData = studentsRes.data ?? [];
-    const attendanceData = attendanceRes.data ?? [];
+    const attendanceData = attendanceRows;
 
     // Build class_id -> school_id map
     const classSchoolMap: Record<string, string> = {};
@@ -106,16 +107,16 @@ const Schools = () => {
 
   const fetchClasses = useCallback(async (schoolId: string) => {
     setClassesLoading(true);
-    const [classesRes, attendanceRes, studentsRes] = await Promise.all([
+    const [classesRes, attendanceRows, studentsRes] = await Promise.all([
       supabase.from('classes').select('*').eq('school_id', schoolId).order('name', { ascending: true }),
-      supabase.from('attendance').select('class_id, date, topic'),
+      fetchAllAttendanceSessions(),
       supabase.from('students').select('id, class_id'),
     ]);
     const classesData = classesRes.data ?? [];
     setClasses(classesData);
     
     const conducted: Record<string, Set<string>> = {};
-    (attendanceRes.data ?? []).forEach((a: any) => {
+    attendanceRows.forEach((a: any) => {
       if (!conducted[a.class_id]) conducted[a.class_id] = new Set();
       conducted[a.class_id].add(`${a.date}|${a.topic || ''}`);
     });
@@ -218,14 +219,12 @@ const Schools = () => {
     toast.info('Preparing PDF export...');
     try {
       const ids = schoolsToExport.map(s => s.id);
-      const [classesRes, studentsRes, attendanceRes] = await Promise.all([
+      const [classesRes, allStudentsData, allAttendanceData] = await Promise.all([
         supabase.from('classes').select('*').in('school_id', ids),
-        supabase.from('students').select('*'),
-        supabase.from('attendance').select('*'),
+        fetchAllPaginated<any>(() => supabase.from('students').select('*')),
+        fetchAllPaginated<any>(() => supabase.from('attendance').select('*')),
       ]);
       const allClassesData = classesRes.data ?? [];
-      const allStudentsData = studentsRes.data ?? [];
-      const allAttendanceData = attendanceRes.data ?? [];
 
       const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 

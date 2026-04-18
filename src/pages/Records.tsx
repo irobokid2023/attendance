@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPaginated } from '@/lib/fetchAllAttendance';
 import { isAttended } from '@/lib/attendanceUtils';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -64,14 +65,16 @@ const Records = () => {
     if (!filterClass) { setStudents([]); setAttendanceMap({}); setSessionDates([]); setTopicMap({}); return; }
 
     const fetchAll = async () => {
-      const [studentsRes, attendanceRes] = await Promise.all([
+      type AttRow = { student_id: string; date: string; status: string; topic: string | null };
+      const [studentsRes, records] = await Promise.all([
         supabase.from('students').select('*').eq('class_id', filterClass).order('full_name'),
-        supabase.from('attendance').select('student_id, date, status, topic').eq('class_id', filterClass).order('date', { ascending: false }),
+        fetchAllPaginated<AttRow>(
+          () => supabase.from('attendance').select('student_id, date, status, topic').eq('class_id', filterClass).order('date', { ascending: false }),
+        ),
       ]);
 
       setStudents(studentsRes.data ?? []);
 
-      const records = attendanceRes.data ?? [];
       const dates = [...new Set(records.map(r => r.date))].sort((a, b) => b.localeCompare(a));
       setSessionDates(dates);
 
