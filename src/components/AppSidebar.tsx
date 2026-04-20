@@ -12,6 +12,8 @@ import {
   MessageSquareText,
   History,
   Settings,
+  IndianRupee,
+  ListChecks,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -26,6 +28,8 @@ const navItems = [
   { to: '/students', icon: Users, label: 'Students' },
   { to: '/attendance', icon: ClipboardCheck, label: 'Attendance' },
   { to: '/topics', icon: MessageSquareText, label: 'Topic of the Day' },
+  { to: '/payments', icon: IndianRupee, label: 'Payments' },
+  { to: '/misc-tasks', icon: ListChecks, label: 'Miscellaneous Tasks' },
   { to: '/grading', icon: Award, label: 'Grading' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/activity-log', icon: History, label: 'Activity Log' },

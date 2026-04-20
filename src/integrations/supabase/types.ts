@@ -237,6 +237,72 @@ export type Database = {
           },
         ]
       }
+      misc_tasks: {
+        Row: {
+          created_at: string
+          id: string
+          marked_by: string
+          school_id: string
+          status: Database["public"]["Enums"]["misc_task_status"]
+          task_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          marked_by: string
+          school_id: string
+          status?: Database["public"]["Enums"]["misc_task_status"]
+          task_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          marked_by?: string
+          school_id?: string
+          status?: Database["public"]["Enums"]["misc_task_status"]
+          task_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          class_id: string
+          created_at: string
+          date: string
+          id: string
+          marked_by: string
+          school_id: string
+          status: Database["public"]["Enums"]["payment_status"]
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          date?: string
+          id?: string
+          marked_by: string
+          school_id: string
+          status: Database["public"]["Enums"]["payment_status"]
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          marked_by?: string
+          school_id?: string
+          status?: Database["public"]["Enums"]["payment_status"]
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -433,6 +499,8 @@ export type Database = {
     }
     Enums: {
       app_role: "instructor"
+      misc_task_status: "done" | "pending" | "not_applicable"
+      payment_status: "paid" | "not_paid"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -561,6 +629,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["instructor"],
+      misc_task_status: ["done", "pending", "not_applicable"],
+      payment_status: ["paid", "not_paid"],
     },
   },
 } as const

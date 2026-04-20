@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-type Section = 'schools' | 'classes' | 'students' | 'attendance' | 'grading' | 'topics' | 'holidays';
+type Section = 'schools' | 'classes' | 'students' | 'attendance' | 'grading' | 'topics' | 'holidays' | 'payments';
 type Action = 'created' | 'updated' | 'deleted' | 'imported' | 'duplicated' | 'exported';
 
 export const logActivity = async ({

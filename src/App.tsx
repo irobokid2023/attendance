@@ -13,6 +13,8 @@ import Classes from "./pages/Classes";
 import Students from "./pages/Students";
 import Attendance from "./pages/Attendance";
 import TopicOfTheDay from "./pages/TopicOfTheDay";
+import Payments from "./pages/Payments";
+import MiscTasks from "./pages/MiscTasks";
 import HolidayCalendar from "./pages/HolidayCalendar";
 import Grading from "./pages/Grading";
 import Profile from "./pages/Profile";
@@ -39,6 +41,8 @@ const App = () => (
             <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
             <Route path="/topics" element={<ProtectedRoute><TopicOfTheDay /></ProtectedRoute>} />
+            <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+            <Route path="/misc-tasks" element={<ProtectedRoute><MiscTasks /></ProtectedRoute>} />
             <Route path="/calendar" element={<ProtectedRoute><HolidayCalendar /></ProtectedRoute>} />
             <Route path="/grading" element={<ProtectedRoute><Grading /></ProtectedRoute>} />
             <Route path="/activity-log" element={<ProtectedRoute><ActivityLog /></ProtectedRoute>} />
