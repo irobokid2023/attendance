@@ -73,15 +73,6 @@ const SidebarContent = ({ user, signOut, onNavClick }: { user: any; signOut: () 
         })}
       </nav>
 
-      {/* User footer */}
-      <div className="p-3 border-t border-sidebar-border">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/50 transition-colors">
-          <UserAvatar name={null} email={user?.email} size="sm" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-sidebar-foreground/80 truncate">{user?.email}</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

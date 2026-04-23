@@ -64,18 +64,13 @@ const Schools = () => {
   const [schoolStats, setSchoolStats] = useState<Record<string, { classes: number; students: number; sessionsConducted: number; totalSessions: number }>>({});
 
   const fetchSchools = async () => {
-    const [schoolsRes, classesRes, studentsRes, attendanceRows] = await Promise.all([
-      supabase.from('schools').select('*').order('created_at', { ascending: false }),
-      supabase.from('classes').select('id, school_id, num_sessions'),
-      supabase.from('students').select('id, class_id'),
+    const [schoolsData, classesData, studentsData, attendanceData] = await Promise.all([
+      fetchAllPaginated<any>(() => supabase.from('schools').select('*').order('created_at', { ascending: false })),
+      fetchAllPaginated<{ id: string; school_id: string; num_sessions: number | null }>(() => supabase.from('classes').select('id, school_id, num_sessions')),
+      fetchAllPaginated<{ id: string; class_id: string }>(() => supabase.from('students').select('id, class_id')),
       fetchAllAttendanceSessions(),
     ]);
-    const schoolsData = schoolsRes.data ?? [];
     setSchools(schoolsData);
-
-    const classesData = classesRes.data ?? [];
-    const studentsData = studentsRes.data ?? [];
-    const attendanceData = attendanceRows;
 
     // Build class_id -> school_id map
     const classSchoolMap: Record<string, string> = {};
@@ -107,12 +102,11 @@ const Schools = () => {
 
   const fetchClasses = useCallback(async (schoolId: string) => {
     setClassesLoading(true);
-    const [classesRes, attendanceRows, studentsRes] = await Promise.all([
-      supabase.from('classes').select('*').eq('school_id', schoolId).order('name', { ascending: true }),
+    const [classesData, attendanceRows, studentsData] = await Promise.all([
+      fetchAllPaginated<any>(() => supabase.from('classes').select('*').eq('school_id', schoolId).order('name', { ascending: true })),
       fetchAllAttendanceSessions(),
-      supabase.from('students').select('id, class_id'),
+      fetchAllPaginated<{ id: string; class_id: string }>(() => supabase.from('students').select('id, class_id')),
     ]);
-    const classesData = classesRes.data ?? [];
     setClasses(classesData);
     
     const conducted: Record<string, Set<string>> = {};
@@ -124,7 +118,7 @@ const Schools = () => {
     Object.entries(conducted).forEach(([id, sessions]) => { conductedCounts[id] = sessions.size; });
     setClassSessionsConducted(conductedCounts);
     const sCounts: Record<string, number> = {};
-    (studentsRes.data ?? []).forEach((s: any) => { sCounts[s.class_id] = (sCounts[s.class_id] || 0) + 1; });
+    studentsData.forEach((s) => { sCounts[s.class_id] = (sCounts[s.class_id] || 0) + 1; });
     setClassStudentCounts(sCounts);
     setClassesLoading(false);
   }, []);

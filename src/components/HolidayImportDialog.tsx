@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Upload, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { capitalizeFields } from '@/lib/utils';
+import { logActivity } from '@/lib/activityLogger';
 import XLSX from 'xlsx-js-style';
 import { format, parse, isValid } from 'date-fns';
 
@@ -123,12 +124,19 @@ const HolidayImportDialog = ({ schools, userId, onImported }: HolidayImportDialo
         const { error } = await supabase.from('holidays').insert(holidays);
         if (error) toast.error(error.message);
         else {
+          const schoolName = schools.find((school) => school.id === schoolId)?.name ?? 'selected school';
           toast.success(`${holidays.length} holiday(s) imported!`);
           onImported();
+          logActivity({
+            action: 'imported',
+            section: 'holidays',
+            description: `Imported ${holidays.length} holiday(s) for "${schoolName}"`,
+            metadata: { count: holidays.length, school_id: schoolId },
+          });
           setOpen(false);
         }
       }
-    } catch (err: any) {
+    } catch (_err: any) {
       toast.error('Failed to parse file');
     }
     setImporting(false);

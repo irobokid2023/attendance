@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { capitalizeWords } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { logActivity } from '@/lib/activityLogger';
 import DashboardLayout from '@/components/DashboardLayout';
 import UserAvatar from '@/components/UserAvatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,13 +47,25 @@ const Profile = () => {
 
   const handleSave = async () => {
     if (!user) return;
+
     setLoading(true);
+    const nextFullName = capitalizeWords(fullName);
     const { error } = await supabase
       .from('profiles')
-      .update({ full_name: capitalizeWords(fullName), email })
+      .update({ full_name: nextFullName, email })
       .eq('user_id', user.id);
-    if (error) toast.error(error.message);
-    else toast.success('Profile updated successfully');
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setFullName(nextFullName);
+      toast.success('Profile updated successfully');
+      logActivity({
+        action: 'updated',
+        section: 'profile',
+        description: 'Updated profile information',
+      });
+    }
     setLoading(false);
   };
 
@@ -73,7 +86,6 @@ const Profile = () => {
       </div>
 
       <div className="max-w-lg space-y-6">
-        {/* Avatar section */}
         <div className="flex items-center gap-4 mb-2">
           <UserAvatar name={fullName} email={email} size="lg" />
           <div>
@@ -156,13 +168,11 @@ const Profile = () => {
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     onClick={async () => {
                       setDeleting(true);
-                      // Delete profile data first
                       if (user) {
                         await supabase.from('profiles').delete().eq('user_id', user.id);
                         await supabase.from('user_roles').delete().eq('user_id', user.id);
                         await supabase.from('activity_logs').delete().eq('user_id', user.id);
                       }
-                      // Sign out (full account deletion requires admin/edge function)
                       await supabase.auth.signOut();
                       toast.success('Account data deleted. You have been signed out.');
                       navigate('/auth');

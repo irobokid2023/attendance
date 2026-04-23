@@ -132,14 +132,14 @@ const Classes = () => {
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
 
   const fetchData = async () => {
-    const [classesRes, schoolsRes, attendanceRows, allStudents] = await Promise.all([
-      supabase.from('classes').select('*, schools(name)').order('created_at', { ascending: false }),
-      supabase.from('schools').select('id, name'),
+    const [classesData, schoolsData, attendanceRows, allStudents] = await Promise.all([
+      fetchAllPaginated<any>(() => supabase.from('classes').select('*, schools(name)').order('created_at', { ascending: false })),
+      fetchAllPaginated<{ id: string; name: string }>(() => supabase.from('schools').select('id, name').order('name', { ascending: true })),
       fetchAllAttendanceSessions(),
       fetchAllPaginated<{ id: string; class_id: string }>(() => supabase.from('students').select('id, class_id')),
     ]);
-    setClasses(classesRes.data ?? []);
-    setSchools(schoolsRes.data ?? []);
+    setClasses(classesData);
+    setSchools(schoolsData);
     const counts: Record<string, Set<string>> = {};
     attendanceRows.forEach((r: any) => { if (!counts[r.class_id]) counts[r.class_id] = new Set(); counts[r.class_id].add(`${r.date}|${r.topic || ''}`); });
     const result: Record<string, number> = {};

@@ -37,7 +37,7 @@ const MiscTasks = () => {
   const { user } = useAuth();
   const [schools, setSchools] = useState<{ id: string; name: string }[]>([]);
   const [savedRecords, setSavedRecords] = useState<Record<string, Status>>({});
-  const [records, setRecords] = useState<Record<string, Status>>({}); // key = `${schoolId}:${taskKey}`
+  const [records, setRecords] = useState<Record<string, Status>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -95,7 +95,7 @@ const MiscTasks = () => {
     toast.success(`Saved ${rows.length} change${rows.length > 1 ? 's' : ''}`);
     logActivity({
       action: 'updated',
-      section: 'schools',
+      section: 'misc_tasks',
       description: `Updated ${rows.length} miscellaneous task${rows.length > 1 ? 's' : ''}`,
       metadata: { count: rows.length },
     });
@@ -147,7 +147,6 @@ const MiscTasks = () => {
           </div>
         </div>
 
-        {/* Summary */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Total</p>

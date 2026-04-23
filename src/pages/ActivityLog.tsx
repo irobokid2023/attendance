@@ -1,23 +1,42 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { History, CalendarIcon, Search } from 'lucide-react';
+import { History, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { exportToExcel } from '@/lib/exportExcel';
-import ExportDropdown from '@/components/ExportDropdown';
-import { exportToPdf } from '@/lib/exportPdf';
 
-const SECTIONS = ['all', 'schools', 'classes', 'students', 'attendance', 'grading', 'topics', 'holidays'] as const;
+const SECTIONS = ['all', 'schools', 'classes', 'students', 'attendance', 'grading', 'topics', 'holidays', 'payments', 'misc_tasks', 'profile'] as const;
+
+const SECTION_LABELS: Record<(typeof SECTIONS)[number], string> = {
+  all: 'All Sections',
+  schools: 'Schools',
+  classes: 'Classes',
+  students: 'Students',
+  attendance: 'Attendance',
+  grading: 'Grading',
+  topics: 'Topics',
+  holidays: 'Holidays',
+  payments: 'Payments',
+  misc_tasks: 'Miscellaneous Tasks',
+  profile: 'Profile',
+};
+
+const RANGE_OPTIONS = [
+  { value: '1', label: 'Last 24 hours' },
+  { value: '7', label: 'Last 7 days' },
+  { value: '14', label: 'Last 14 days' },
+  { value: '30', label: 'Last 30 days' },
+] as const;
+
+const ACTIONS = ['created', 'updated', 'deleted', 'imported', 'duplicated', 'exported'] as const;
+const PAGE_SIZE = 1000;
 
 const actionColors: Record<string, string> = {
   created: 'bg-success/10 text-success border-success/20',
@@ -39,84 +58,112 @@ interface ActivityLog {
   created_at: string;
 }
 
+const getFromDate = (rangeDays: string) => {
+  const days = parseInt(rangeDays, 10);
+  const date = new Date();
+
+  if (days === 1) {
+    date.setHours(date.getHours() - 24);
+  } else {
+    date.setDate(date.getDate() - days);
+  }
+
+  return date;
+};
+
 const ActivityLogPage = () => {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterSection, setFilterSection] = useState('all');
   const [filterAction, setFilterAction] = useState('all');
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState<Date | undefined>();
-  const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [rangeDays, setRangeDays] = useState<string>('1');
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true);
-    let query = supabase
-      .from('activity_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(500);
 
-    if (filterSection !== 'all') query = query.eq('section', filterSection);
-    if (filterAction !== 'all') query = query.eq('action', filterAction);
-    if (dateFrom) query = query.gte('created_at', format(dateFrom, 'yyyy-MM-dd'));
-    if (dateTo) query = query.lte('created_at', format(dateTo, 'yyyy-MM-dd') + 'T23:59:59');
+    const fromDate = getFromDate(rangeDays);
+    const allLogs: ActivityLog[] = [];
+    let offset = 0;
 
-    const { data } = await query;
-    setLogs((data as ActivityLog[]) ?? []);
+    while (true) {
+      let query = supabase
+        .from('activity_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .gte('created_at', fromDate.toISOString())
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (filterSection !== 'all') query = query.eq('section', filterSection);
+      if (filterAction !== 'all') query = query.eq('action', filterAction);
+
+      const { data, error } = await query;
+
+      if (error) break;
+
+      const batch = (data as ActivityLog[]) ?? [];
+      allLogs.push(...batch);
+
+      if (batch.length < PAGE_SIZE) break;
+      offset += PAGE_SIZE;
+    }
+
+    setLogs(allLogs);
     setLoading(false);
-  };
+  }, [filterAction, filterSection, rangeDays]);
 
-  useEffect(() => { fetchLogs(); }, [filterSection, filterAction, dateFrom, dateTo]);
+  useEffect(() => {
+    void fetchLogs();
+  }, [fetchLogs]);
+
+  useEffect(() => {
+    const refreshLogs = () => void fetchLogs();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshLogs();
+    };
+
+    const intervalId = window.setInterval(refreshLogs, 30000);
+    window.addEventListener('focus', refreshLogs);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshLogs);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchLogs]);
 
   const filtered = useMemo(() => {
     if (!search) return logs;
+
     const q = search.toLowerCase();
-    return logs.filter(l =>
-      l.description.toLowerCase().includes(q) ||
-      l.user_name.toLowerCase().includes(q) ||
-      l.section.toLowerCase().includes(q)
+    return logs.filter((log) =>
+      log.description.toLowerCase().includes(q) ||
+      log.user_name.toLowerCase().includes(q) ||
+      log.section.toLowerCase().includes(q) ||
+      log.action.toLowerCase().includes(q),
     );
   }, [logs, search]);
 
-  const handleExportExcel = () => {
-    exportToExcel({
-      filename: 'activity_log.xlsx',
-      sheetName: 'Activity Log',
-      rows: filtered.map(l => ({
-        'Date & Time': format(new Date(l.created_at), 'dd MMM yyyy, hh:mm a'),
-        'User': l.user_name,
-        'Action': l.action,
-        'Section': l.section,
-        'Description': l.description,
-      })),
-    });
-  };
-
-  const handleExportPdf = () => {
-    exportToPdf({
-      title: 'Activity Log',
-      headers: ['Date & Time', 'User', 'Action', 'Section', 'Description'],
-      rows: filtered.map(l => [
-        format(new Date(l.created_at), 'dd MMM yy, hh:mm a'),
-        l.user_name, l.action, l.section, l.description,
-      ]),
-      filename: 'activity_log.pdf',
-    });
-  };
-
   const formatTimeAgo = (dateStr: string) => {
     const now = new Date();
-    const d = new Date(dateStr);
-    const diffMs = now.getTime() - d.getTime();
+    const date = new Date(dateStr);
+    const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
+
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
+
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
+
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays < 7) return `${diffDays}d ago`;
-    return format(d, 'dd MMM yyyy');
+
+    return format(date, 'dd MMM yyyy');
   };
+
+  const hasActiveFilters = rangeDays !== '1' || filterSection !== 'all' || filterAction !== 'all' || search;
 
   return (
     <DashboardLayout>
@@ -128,57 +175,58 @@ const ActivityLogPage = () => {
             </h1>
             <p className="text-muted-foreground text-sm mt-1">Track all actions performed across the platform</p>
           </div>
-          <ExportDropdown onExportExcel={handleExportExcel} onExportPdf={handleExportPdf} />
         </div>
 
-        {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="pl-9" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="pl-9" />
           </div>
-          <Select value={filterSection} onValueChange={setFilterSection}>
-            <SelectTrigger><SelectValue placeholder="All Sections" /></SelectTrigger>
+          <Select value={rangeDays} onValueChange={setRangeDays}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {SECTIONS.map(s => <SelectItem key={s} value={s}>{s === 'all' ? 'All Sections' : s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
+              {RANGE_OPTIONS.map((range) => (
+                <SelectItem key={range.value} value={range.value}>
+                  {range.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterSection} onValueChange={setFilterSection}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Sections" />
+            </SelectTrigger>
+            <SelectContent>
+              {SECTIONS.map((section) => (
+                <SelectItem key={section} value={section}>
+                  {SECTION_LABELS[section]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={filterAction} onValueChange={setFilterAction}>
-            <SelectTrigger><SelectValue placeholder="All Actions" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="All Actions" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Actions</SelectItem>
-              {['created', 'updated', 'deleted', 'imported', 'duplicated', 'exported'].map(a =>
-                <SelectItem key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</SelectItem>
-              )}
+              {ACTIONS.map((action) => (
+                <SelectItem key={action} value={action}>
+                  {action.charAt(0).toUpperCase() + action.slice(1)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn('justify-start text-left font-normal', !dateFrom && 'text-muted-foreground')}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFrom ? format(dateFrom, 'dd MMM yyyy') : 'From date'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} /></PopoverContent>
-          </Popover>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn('justify-start text-left font-normal', !dateTo && 'text-muted-foreground')}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateTo ? format(dateTo, 'dd MMM yyyy') : 'To date'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={dateTo} onSelect={setDateTo} /></PopoverContent>
-          </Popover>
         </div>
 
-        {(dateFrom || dateTo || filterSection !== 'all' || filterAction !== 'all') && (
-          <Button variant="ghost" size="sm" onClick={() => { setDateFrom(undefined); setDateTo(undefined); setFilterSection('all'); setFilterAction('all'); setSearch(''); }}>
-            Clear filters
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={() => { setRangeDays('1'); setFilterSection('all'); setFilterAction('all'); setSearch(''); }}>
+            Reset filters
           </Button>
         )}
 
-        {/* Log table */}
         <Card>
           <CardContent className="p-0">
             {loading ? (
@@ -196,12 +244,12 @@ const ActivityLogPage = () => {
                       <TableHead className="w-40">When</TableHead>
                       <TableHead className="w-40">User</TableHead>
                       <TableHead className="w-24">Action</TableHead>
-                      <TableHead className="w-24">Section</TableHead>
+                      <TableHead className="w-32">Section</TableHead>
                       <TableHead>Description</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map(log => (
+                    {filtered.map((log) => (
                       <TableRow key={log.id}>
                         <TableCell>
                           <div className="text-sm">{formatTimeAgo(log.created_at)}</div>
@@ -209,10 +257,14 @@ const ActivityLogPage = () => {
                         </TableCell>
                         <TableCell className="font-medium">{log.user_name}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={cn('text-xs capitalize', actionColors[log.action] || '')}>{log.action}</Badge>
+                          <Badge variant="outline" className={cn('text-xs capitalize', actionColors[log.action] || '')}>
+                            {log.action}
+                          </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className="text-xs capitalize">{log.section}</Badge>
+                          <Badge variant="secondary" className="text-xs capitalize">
+                            {SECTION_LABELS[log.section as keyof typeof SECTION_LABELS] || log.section.replace(/_/g, ' ')}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-md truncate">{log.description}</TableCell>
                       </TableRow>
