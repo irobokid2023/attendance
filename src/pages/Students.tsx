@@ -23,17 +23,17 @@ import ExportDropdown from '@/components/ExportDropdown';
 interface StudentForm {
   full_name: string;
   class_id: string;
+  laptop_no: string;
   grade: string;
   div: string;
   parent_email_1: string;
-  parent_email_2: string;
   parent_mobile_1: string;
   parent_mobile_2: string;
 }
 
 const emptyForm: StudentForm = {
-  full_name: '', class_id: '', grade: '', div: '',
-  parent_email_1: '', parent_email_2: '', parent_mobile_1: '', parent_mobile_2: '',
+  full_name: '', class_id: '', laptop_no: '', grade: '', div: '',
+  parent_email_1: '', parent_mobile_1: '', parent_mobile_2: '',
 };
 
 const PAGE_SIZE = 20;
@@ -142,8 +142,9 @@ const Students = () => {
     setFormSchool(classes.find(c => c.id === s.class_id)?.school_id || '');
     setForm({
       full_name: s.full_name, class_id: s.class_id,
+      laptop_no: s.laptop_no ?? '',
       grade: s.grade ?? '', div: s.div ?? '',
-      parent_email_1: s.parent_email_1 ?? '', parent_email_2: s.parent_email_2 ?? '',
+      parent_email_1: s.parent_email_1 ?? '',
       parent_mobile_1: s.parent_mobile_1 ?? '', parent_mobile_2: s.parent_mobile_2 ?? '',
     });
     setOpen(true);
@@ -154,8 +155,9 @@ const Students = () => {
     setLoading(true);
     const payload = capitalizeFields({
       full_name: form.full_name, class_id: form.class_id,
+      laptop_no: form.laptop_no || null,
       grade: form.grade || null, div: form.div || null,
-      parent_email_1: form.parent_email_1 || null, parent_email_2: form.parent_email_2 || null,
+      parent_email_1: form.parent_email_1 || null,
       parent_mobile_1: form.parent_mobile_1 || null, parent_mobile_2: form.parent_mobile_2 || null,
     }, ['full_name']);
     if (editId) {
@@ -181,17 +183,17 @@ const Students = () => {
 
   const handleExport = () => {
     exportToExcel({ filename: 'students.xlsx', sheetName: 'Students', rows: filtered.map((s) => ({
-      Name: s.full_name, Grade: s.grade ?? '', Div: s.div ?? '',
+      Name: s.full_name, 'Laptop No.': s.laptop_no ?? '', Grade: s.grade ?? '', Div: s.div ?? '',
       Class: s.classes?.name ?? '', School: s.classes?.schools?.name ?? '',
-      'Parent Email 1': s.parent_email_1 ?? '', 'Parent Email 2': s.parent_email_2 ?? '',
+      'Parent Email 1': s.parent_email_1 ?? '',
       'Parent Mobile 1': s.parent_mobile_1 ?? '', 'Parent Mobile 2': s.parent_mobile_2 ?? '',
     })) });
   };
 
   const handleExportPdf = () => {
-    const headers = ['Name', 'Grade', 'Div', 'Class', 'School', 'Parent Email 1', 'Parent Mobile 1'];
+    const headers = ['Name', 'Laptop No.', 'Grade', 'Div', 'Class', 'School', 'Parent Email 1', 'Parent Mobile 1'];
     const rows = filtered.map(s => [
-      s.full_name, s.grade ?? '—', s.div ?? '—',
+      s.full_name, s.laptop_no ?? '—', s.grade ?? '—', s.div ?? '—',
       s.classes?.name ?? '—', s.classes?.schools?.name ?? '—',
       s.parent_email_1 ?? '—', s.parent_mobile_1 ?? '—',
     ]);
@@ -200,11 +202,11 @@ const Students = () => {
 
   const downloadTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['Full Name', 'Grade', 'Div', 'Parent Email 1', 'Parent Email 2', 'Parent Mobile 1', 'Parent Mobile 2'],
-      ['Jane Smith', '5', 'A', 'parent1@example.com', '', '9876543210', ''],
-      ['John Doe', '5', 'B', 'parent2@example.com', 'parent2b@example.com', '9876543211', '9876543212'],
+      ['Full Name', 'Laptop No.', 'Grade', 'Div', 'Parent Email 1', 'Parent Mobile 1', 'Parent Mobile 2'],
+      ['Jane Smith', 'LP-001', '5', 'A', 'parent1@example.com', '9876543210', ''],
+      ['John Doe', 'LP-002', '5', 'B', 'parent2@example.com', '9876543211', '9876543212'],
     ]);
-    ws['!cols'] = [{ wch: 25 }, { wch: 10 }, { wch: 8 }, { wch: 25 }, { wch: 25 }, { wch: 18 }, { wch: 18 }];
+    ws['!cols'] = [{ wch: 25 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 25 }, { wch: 18 }, { wch: 18 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Students');
     XLSX.writeFile(wb, 'students_import_template.xlsx');
@@ -235,10 +237,10 @@ const Students = () => {
     setImporting(true);
     const rows = importData.map((row) => capitalizeFields({
       full_name: String(row['Full Name'] ?? '').trim(),
+      laptop_no: row['Laptop No.'] ? String(row['Laptop No.']).trim() : (row['Laptop No'] ? String(row['Laptop No']).trim() : null),
       grade: row['Grade'] ? String(row['Grade']).trim() : null,
       div: row['Div'] ? String(row['Div']).trim() : null,
       parent_email_1: row['Parent Email 1'] ? String(row['Parent Email 1']).trim() : null,
-      parent_email_2: row['Parent Email 2'] ? String(row['Parent Email 2']).trim() : null,
       parent_mobile_1: row['Parent Mobile 1'] ? String(row['Parent Mobile 1']).trim() : null,
       parent_mobile_2: row['Parent Mobile 2'] ? String(row['Parent Mobile 2']).trim() : null,
       class_id: importClassId,
@@ -285,10 +287,10 @@ const Students = () => {
                       <SelectContent>{formFilteredClasses.map((c) => <SelectItem key={c.id} value={c.id}>{getClassName(c)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2 col-span-2"><Label>Laptop No.</Label><Input value={form.laptop_no} onChange={(e) => setField('laptop_no', e.target.value)} placeholder="e.g. LP-001" /></div>
                   <div className="space-y-2"><Label>Grade *</Label><Input value={form.grade} onChange={(e) => setField('grade', e.target.value)} placeholder="e.g. 5" required /></div>
                   <div className="space-y-2"><Label>Div *</Label><Input value={form.div} onChange={(e) => setField('div', e.target.value)} placeholder="e.g. A" required /></div>
                   <div className="space-y-2"><Label>Parent Email 1</Label><Input type="email" value={form.parent_email_1} onChange={(e) => setField('parent_email_1', e.target.value)} placeholder="parent1@example.com" /></div>
-                  <div className="space-y-2"><Label>Parent Email 2</Label><Input type="email" value={form.parent_email_2} onChange={(e) => setField('parent_email_2', e.target.value)} placeholder="parent2@example.com" /></div>
                   <div className="space-y-2"><Label>Parent Mobile 1</Label><Input value={form.parent_mobile_1} onChange={(e) => setField('parent_mobile_1', e.target.value)} placeholder="e.g. 9876543210" /></div>
                   <div className="space-y-2"><Label>Parent Mobile 2</Label><Input value={form.parent_mobile_2} onChange={(e) => setField('parent_mobile_2', e.target.value)} placeholder="e.g. 9876543211" /></div>
                 </div>
@@ -305,7 +307,7 @@ const Students = () => {
           <div className="space-y-4">
             <div className="rounded-lg border border-dashed p-4 space-y-3">
               <p className="text-sm text-muted-foreground">Download the sample template, fill in student details, then upload the file.</p>
-              <p className="text-xs text-muted-foreground">Template columns: Full Name, Grade, Div, Parent Email 1, Parent Email 2, Parent Mobile 1, Parent Mobile 2</p>
+              <p className="text-xs text-muted-foreground">Template columns: Full Name, Laptop No., Grade, Div, Parent Email 1, Parent Mobile 1, Parent Mobile 2</p>
               <Button variant="outline" size="sm" onClick={downloadTemplate}><FileDown className="w-4 h-4 mr-2" />Download Template</Button>
             </div>
 
@@ -400,9 +402,9 @@ const Students = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12"><Checkbox checked={selected.size === paginated.length && paginated.length > 0} onCheckedChange={toggleAll} /></TableHead>
-                  <TableHead>Name</TableHead><TableHead>Grade</TableHead><TableHead>Div</TableHead>
+                  <TableHead>Name</TableHead><TableHead>Laptop No.</TableHead><TableHead>Grade</TableHead><TableHead>Div</TableHead>
                   <TableHead>Parent Email 1</TableHead><TableHead>Parent Mobile 1</TableHead>
-                  <TableHead>Parent Email 2</TableHead><TableHead>Parent Mobile 2</TableHead>
+                  <TableHead>Parent Mobile 2</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -411,11 +413,11 @@ const Students = () => {
                   <TableRow key={s.id}>
                     <TableCell><Checkbox checked={selected.has(s.id)} onCheckedChange={() => toggleSelect(s.id)} /></TableCell>
                     <TableCell className="font-medium">{s.full_name}</TableCell>
+                    <TableCell>{s.laptop_no ?? '—'}</TableCell>
                     <TableCell>{s.grade ?? '—'}</TableCell>
                     <TableCell>{s.div ?? '—'}</TableCell>
                     <TableCell>{s.parent_email_1 ?? '—'}</TableCell>
                     <TableCell>{s.parent_mobile_1 ?? '—'}</TableCell>
-                    <TableCell>{s.parent_email_2 ?? '—'}</TableCell>
                     <TableCell>{s.parent_mobile_2 ?? '—'}</TableCell>
                     <TableCell><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(s)}><Pencil className="w-3.5 h-3.5" /></Button></TableCell>
                   </TableRow>

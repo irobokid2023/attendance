@@ -21,17 +21,19 @@ const TASKS: { key: string; label: string }[] = [
   { key: 'staff_birthdates', label: 'School Staff Names and Birthdates' },
   { key: 'school_magazine', label: 'School Magazine Article Submitted' },
   { key: 'quiz_book_material', label: 'Quiz Book & Take-Home Material Presented' },
+  { key: 'photos_videos', label: 'Photos and Videos' },
 ];
 
-type Status = 'done' | 'pending' | 'not_applicable';
+type Status = 'done' | 'pending' | 'not_applicable' | 'granted';
 
 const STATUS_META: Record<Status, { label: string; icon: any; cls: string }> = {
   done: { label: 'Done', icon: CheckCircle2, cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25' },
   pending: { label: 'Pending', icon: Clock, cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/25' },
   not_applicable: { label: 'N/A', icon: MinusCircle, cls: 'bg-muted text-muted-foreground border-border hover:bg-muted/80' },
+  granted: { label: 'Granted', icon: CheckCircle2, cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30 hover:bg-sky-500/25' },
 };
 
-const NEXT: Record<Status, Status> = { pending: 'done', done: 'not_applicable', not_applicable: 'pending' };
+const NEXT: Record<Status, Status> = { pending: 'done', done: 'granted', granted: 'not_applicable', not_applicable: 'pending' };
 
 const MiscTasks = () => {
   const { user } = useAuth();
@@ -105,16 +107,17 @@ const MiscTasks = () => {
 
   const summary = useMemo(() => {
     const total = schools.length * TASKS.length;
-    let done = 0, pending = 0, na = 0;
+    let done = 0, pending = 0, na = 0, granted = 0;
     schools.forEach((s) => {
       TASKS.forEach((t) => {
         const status = records[`${s.id}:${t.key}`] || 'pending';
         if (status === 'done') done++;
         else if (status === 'not_applicable') na++;
+        else if (status === 'granted') granted++;
         else pending++;
       });
     });
-    return { total, done, pending, na };
+    return { total, done, pending, na, granted };
   }, [schools, records]);
 
   const hasChanges = dirtyKeys.length > 0;
@@ -126,7 +129,7 @@ const MiscTasks = () => {
           <div>
             <h1 className="font-heading text-3xl font-bold text-foreground tracking-tight">Miscellaneous Tasks</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Track operational checklist tasks per school. Click any cell to cycle through Pending → Done → N/A, then save.
+              Track operational checklist tasks per school. Click any cell to cycle through Pending → Done → Granted → N/A, then save.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -147,7 +150,7 @@ const MiscTasks = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <Card className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Total</p>
             <p className="text-2xl font-bold text-foreground mt-1">{summary.total}</p>
@@ -159,6 +162,10 @@ const MiscTasks = () => {
           <Card className="p-4">
             <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider">Pending</p>
             <p className="text-2xl font-bold text-foreground mt-1">{summary.pending}</p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-xs text-sky-600 dark:text-sky-400 uppercase tracking-wider">Granted</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{summary.granted}</p>
           </Card>
           <Card className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">N/A</p>

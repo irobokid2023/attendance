@@ -80,7 +80,7 @@ export async function exportSchoolsAsZip(schoolIds: string[]) {
       // Build class display name for title row
       const classDisplayName = [cls.name, cls.grade, cls.div].filter(Boolean).join(' - ') + (cls.instructor_names ? ` | ${cls.instructor_names}` : '') + (cls.day ? ` | ${cls.day}` : '') + (cls.timing ? ` | ${cls.timing}` : '') + (cls.venue ? ` | ${cls.venue}` : '');
       const titleRow = [classDisplayName];
-      const header1 = ['Student Name', 'Grade', 'Division', 'Parent Email 1', 'Parent Email 2', 'Parent Mobile 1', 'Parent Mobile 2', 'Total', ...dateHeaders];
+      const header1 = ['Student Name', 'Laptop No.', 'Grade', 'Division', 'Parent Email 1', 'Parent Mobile 1', 'Parent Mobile 2', 'Total', ...dateHeaders];
       const header2 = ['', '', '', '', '', '', '', '', ...dayHeaders];
       const header3 = ['', '', '', '', '', '', '', '', ...topicHeaders];
 
@@ -95,7 +95,7 @@ export async function exportSchoolsAsZip(schoolIds: string[]) {
           return '';
         });
         const attended = statuses.filter((x) => x === 'P' || x === 'K' || x === 'Q').length;
-        return [s.full_name, s.grade ?? '', s.div ?? '', s.parent_email_1 ?? '', s.parent_email_2 ?? '', s.parent_mobile_1 ?? '', s.parent_mobile_2 ?? '', `${attended} / ${sessionKeys.length}`, ...statuses];
+        return [s.full_name, s.laptop_no ?? '', s.grade ?? '', s.div ?? '', s.parent_email_1 ?? '', s.parent_mobile_1 ?? '', s.parent_mobile_2 ?? '', `${attended} / ${sessionKeys.length}`, ...statuses];
       });
 
       const sheetData = [titleRow, header1, header2, header3, ...dataRows];

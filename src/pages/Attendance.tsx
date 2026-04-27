@@ -23,6 +23,8 @@ import { exportToPdf } from '@/lib/exportPdf';
 import ExportDropdown from '@/components/ExportDropdown';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Trash2 } from 'lucide-react';
 
 type Status = 'present' | 'absent' | 'kit' | 'quiz' | 'left';
 
@@ -336,6 +338,35 @@ const Attendance = () => {
     setChangingDate(false);
   };
 
+  const handleDeleteSession = async () => {
+    if (!filterClass || !selectedSession) return;
+    const { error } = await supabase
+      .from('attendance')
+      .delete()
+      .eq('class_id', filterClass)
+      .eq('date', dateStr)
+      .eq('topic', selectedSession);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Session "${selectedSession}" deleted for ${format(selectedDate, 'PPP')}`);
+    const cls = allClasses.find(c => c.id === filterClass);
+    logActivity({ action: 'deleted', section: 'attendance', description: `Deleted attendance for ${cls ? getClassName(cls) : 'class'} on ${dateStr} - ${selectedSession}` });
+
+    // Refresh sessions list for this date
+    const { data } = await supabase
+      .from('attendance')
+      .select('topic')
+      .eq('class_id', filterClass)
+      .eq('date', dateStr);
+    const topicSet = new Set<string>();
+    (data ?? []).forEach(r => { if (r.topic) topicSet.add(r.topic); });
+    const remaining = [...topicSet];
+    setExistingSessions(remaining);
+    setSelectedSession(null);
+    setIsNewSession(false);
+    setAttendance({});
+    setTopic('');
+  };
+
   const markAll = (status: Status) => {
     const updated: Record<string, Status> = {};
     filteredStudents.forEach(s => { updated[s.id] = status; });
@@ -472,9 +503,37 @@ const Attendance = () => {
                       </PopoverContent>
                     </Popover>
                     {selectedSession && (
-                      <Button size="sm" variant="outline" onClick={() => { setNewDate(selectedDate); setChangeDateOpen(true); }}>
-                        Change Date
-                      </Button>
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => { setNewDate(selectedDate); setChangeDateOpen(true); }}>
+                          Change Date
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10">
+                              <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete Session
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete this attendance session?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently remove the attendance entries for{' '}
+                                <strong>"{selectedSession}"</strong> on{' '}
+                                <strong>{format(selectedDate, 'PPP')}</strong>. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handleDeleteSession}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
                     )}
                   </div>
                 </div>

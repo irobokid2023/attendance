@@ -460,7 +460,7 @@ const Schools = () => {
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(school)}><Pencil className="w-3.5 h-3.5" /></Button>
                     <Checkbox checked={selected.has(school.id)} onCheckedChange={() => toggleSelect(school.id)} />
                   </div>
-                  <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><div className={cn("w-2.5 h-2.5 rounded-full", getSchoolColor(school.name).dot)} /><School className="w-4 h-4 text-primary" />{school.name}</CardTitle></CardHeader>
+                  <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><School className="w-4 h-4 text-primary" />{school.name}</CardTitle></CardHeader>
                    <CardContent>
                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
                        <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{schoolStats[school.id]?.classes ?? 0} classes</span>
@@ -488,7 +488,7 @@ const Schools = () => {
                   {filtered.map((school) => (
                     <TableRow key={school.id} className="cursor-pointer" onClick={() => handleSelectSchool(school.id)}>
                       <TableCell onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(school.id)} onCheckedChange={() => toggleSelect(school.id)} /></TableCell>
-                      <TableCell className="font-medium"><div className="flex items-center gap-2"><div className={cn("w-2.5 h-2.5 rounded-full shrink-0", getSchoolColor(school.name).dot)} /><School className="w-4 h-4 text-primary" />{school.name}</div></TableCell>
+                      <TableCell className="font-medium"><div className="flex items-center gap-2"><School className="w-4 h-4 text-primary" />{school.name}</div></TableCell>
                        <TableCell className="text-muted-foreground">{schoolStats[school.id]?.classes ?? 0}</TableCell>
                        <TableCell className="text-muted-foreground">{schoolStats[school.id]?.students ?? 0}</TableCell>
                        <TableCell className="text-muted-foreground">{(school.days ?? []).length > 0 ? (school.days as string[]).map((d: string) => d.slice(0, 3)).join(', ') : '—'}</TableCell>

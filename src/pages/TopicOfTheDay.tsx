@@ -82,24 +82,37 @@ const TopicOfTheDay = () => {
     setSaving(true);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const { error } = await supabase.from('topics').insert({
-        class_id: filterClass,
-        date: dateStr,
-        topic: capitalize(topicText.trim()),
-        created_by: user?.id || '',
-      });
-      if (error) {
-        if (error.code === '23505') {
-          toast.error('This topic already exists for the selected class and date');
-        } else {
-          throw error;
-        }
+      // Check if a topic already exists for this class & date to determine action label
+      const { data: existing } = await supabase
+        .from('topics')
+        .select('id')
+        .eq('class_id', filterClass)
+        .eq('date', dateStr)
+        .maybeSingle();
+
+      const { error } = await supabase
+        .from('topics')
+        .upsert(
+          {
+            class_id: filterClass,
+            date: dateStr,
+            topic: capitalize(topicText.trim()),
+            created_by: user?.id || '',
+          },
+          { onConflict: 'class_id,date' }
+        );
+      if (error) throw error;
+
+      const cls = allClasses.find(c => c.id === filterClass);
+      const clsLabel = cls ? [cls.name, cls.grade, cls.div].filter(Boolean).join(' - ') : 'class';
+      if (existing) {
+        toast.success('Topic updated successfully!');
+        logActivity({ action: 'updated', section: 'topics', description: `Overwrote topic for ${clsLabel} on ${dateStr}` });
       } else {
         toast.success('Topic saved successfully!');
-        const cls = allClasses.find(c => c.id === filterClass);
-        logActivity({ action: 'created', section: 'topics', description: `Added topic for ${cls ? [cls.name, cls.grade, cls.div].filter(Boolean).join(' - ') : 'class'}` });
-        setTopicText('');
+        logActivity({ action: 'created', section: 'topics', description: `Added topic for ${clsLabel}` });
       }
+      setTopicText('');
     } catch (err: any) {
       toast.error(err.message || 'Failed to save topic');
     } finally {
@@ -115,19 +128,6 @@ const TopicOfTheDay = () => {
         .select('*, classes(name, grade, div, school_id, schools(name))')
         .order('date', { ascending: false });
 
-      if (recSchool) {
-        const classIds = recFilteredClasses.map(c => c.id);
-        if (classIds.length > 0) {
-          query = query.in('class_id', classIds);
-        } else {
-          setRecords([]);
-          setLoadingRecords(false);
-          return;
-        }
-      }
-      if (recClass) {
-        query = query.eq('class_id', recClass);
-      }
       if (recDateFrom) {
         query = query.gte('date', format(recDateFrom, 'yyyy-MM-dd'));
       }
@@ -244,23 +244,7 @@ const TopicOfTheDay = () => {
 
         {/* VIEW RECORDS TAB */}
         <TabsContent value="records">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <Select value={recSchool} onValueChange={setRecSchool}>
-              <SelectTrigger><SelectValue placeholder="All Schools" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Schools</SelectItem>
-                {schools.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-
-            <Select value={recClass} onValueChange={setRecClass}>
-              <SelectTrigger><SelectValue placeholder="All Classes" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Classes</SelectItem>
-                {recFilteredClasses.map(c => <SelectItem key={c.id} value={c.id}>{getClassName(c)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 max-w-2xl">
             <Popover open={recDateFromOpen} onOpenChange={setRecDateFromOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !recDateFrom && "text-muted-foreground")}>

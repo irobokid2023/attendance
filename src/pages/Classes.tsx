@@ -280,7 +280,7 @@ const Classes = () => {
           'Arduino Electronics and Programming',
           'Arduino Robotics',
           'Coding (Scratch)',
-          'Coding AI',
+          'Coding AI / Applied AI',
           'Electrics and Circuits (Breadboard Kit)',
           'Electrics and Circuits (Snap Kit)',
           'Lego Robotics - Ev3',
@@ -305,7 +305,7 @@ const Classes = () => {
               <SelectItem value="Arduino Electronics and Programming">Arduino Electronics and Programming</SelectItem>
               <SelectItem value="Arduino Robotics">Arduino Robotics</SelectItem>
               <SelectItem value="Coding (Scratch)">Coding (Scratch)</SelectItem>
-              <SelectItem value="Coding AI">Coding AI</SelectItem>
+              <SelectItem value="Coding AI / Applied AI">Coding AI / Applied AI</SelectItem>
               <SelectItem value="Electrics and Circuits (Breadboard Kit)">Electrics and Circuits (Breadboard Kit)</SelectItem>
               <SelectItem value="Electrics and Circuits (Snap Kit)">Electrics and Circuits (Snap Kit)</SelectItem>
               <SelectItem value="Lego Robotics - Ev3">Lego Robotics - Ev3</SelectItem>
@@ -410,8 +410,8 @@ const Classes = () => {
         {studentsLoading ? <div className="text-center py-20 text-muted-foreground">Loading students...</div> : students.length === 0 ? (
           <div className="text-center py-20"><Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">No students in this class yet.</p></div>
         ) : (
-          <Card><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead className="w-16">#</TableHead><TableHead>Roll No</TableHead><TableHead>Student Name</TableHead><TableHead>Grade</TableHead><TableHead>Div</TableHead><TableHead>Parent Mobile 1</TableHead><TableHead>Parent Email 1</TableHead></TableRow></TableHeader>
-            <TableBody>{students.map((s, i) => (<TableRow key={s.id}><TableCell className="text-muted-foreground">{i + 1}</TableCell><TableCell className="font-medium">{s.roll_number ?? '—'}</TableCell><TableCell>{s.full_name}</TableCell><TableCell>{s.grade ?? '—'}</TableCell><TableCell>{s.div ?? '—'}</TableCell><TableCell>{s.parent_mobile_1 ?? '—'}</TableCell><TableCell>{s.parent_email_1 ?? '—'}</TableCell></TableRow>))}</TableBody></Table></CardContent></Card>
+          <Card><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead className="w-16">#</TableHead><TableHead>Roll No</TableHead><TableHead>Student Name</TableHead><TableHead>Laptop No.</TableHead><TableHead>Grade</TableHead><TableHead>Div</TableHead><TableHead>Parent Mobile 1</TableHead><TableHead>Parent Email 1</TableHead></TableRow></TableHeader>
+            <TableBody>{students.map((s, i) => (<TableRow key={s.id}><TableCell className="text-muted-foreground">{i + 1}</TableCell><TableCell className="font-medium">{s.roll_number ?? '—'}</TableCell><TableCell>{s.full_name}</TableCell><TableCell>{s.laptop_no ?? '—'}</TableCell><TableCell>{s.grade ?? '—'}</TableCell><TableCell>{s.div ?? '—'}</TableCell><TableCell>{s.parent_mobile_1 ?? '—'}</TableCell><TableCell>{s.parent_email_1 ?? '—'}</TableCell></TableRow>))}</TableBody></Table></CardContent></Card>
         )}
       </DashboardLayout>
     );

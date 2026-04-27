@@ -386,6 +386,7 @@ export type Database = {
           full_name: string
           grade: string | null
           id: string
+          laptop_no: string | null
           parent_email_1: string | null
           parent_email_2: string | null
           parent_mobile_1: string | null
@@ -400,6 +401,7 @@ export type Database = {
           full_name: string
           grade?: string | null
           id?: string
+          laptop_no?: string | null
           parent_email_1?: string | null
           parent_email_2?: string | null
           parent_mobile_1?: string | null
@@ -414,6 +416,7 @@ export type Database = {
           full_name?: string
           grade?: string | null
           id?: string
+          laptop_no?: string | null
           parent_email_1?: string | null
           parent_email_2?: string | null
           parent_mobile_1?: string | null
@@ -489,6 +492,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_old_topics: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -499,7 +503,7 @@ export type Database = {
     }
     Enums: {
       app_role: "instructor"
-      misc_task_status: "done" | "pending" | "not_applicable"
+      misc_task_status: "done" | "pending" | "not_applicable" | "granted"
       payment_status: "paid" | "not_paid"
     }
     CompositeTypes: {
@@ -629,7 +633,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["instructor"],
-      misc_task_status: ["done", "pending", "not_applicable"],
+      misc_task_status: ["done", "pending", "not_applicable", "granted"],
       payment_status: ["paid", "not_paid"],
     },
   },
