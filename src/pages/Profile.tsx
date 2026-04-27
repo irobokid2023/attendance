@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { User, Mail, Save, Trash2 } from 'lucide-react';
+import { User, Mail, Save, Trash2, KeyRound } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -25,6 +25,9 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -78,6 +81,32 @@ const Profile = () => {
     else toast.success('Password reset email sent. Check your inbox.');
   };
 
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('Password updated successfully');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      logActivity({
+        action: 'updated',
+        section: 'profile',
+        description: 'Changed account password',
+      });
+    }
+    setChangingPassword(false);
+  };
+
   return (
     <DashboardLayout>
       <div className="page-header">
@@ -128,13 +157,35 @@ const Profile = () => {
               <Mail className="w-4 h-4" /> Security
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              Send a password reset link to your email address.
-            </p>
-            <Button variant="outline" onClick={handlePasswordReset}>
-              Reset Password
-            </Button>
+          <CardContent className="space-y-6">
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-foreground">Change password</p>
+              <p className="text-xs text-muted-foreground">
+                Update your password directly without using an email link.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input id="newPassword" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 6 characters" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+                <Input id="confirmNewPassword" type="password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} placeholder="Repeat new password" />
+              </div>
+              <Button onClick={handleChangePassword} disabled={changingPassword}>
+                <KeyRound className="w-4 h-4 mr-2" />
+                {changingPassword ? 'Updating...' : 'Update Password'}
+              </Button>
+            </div>
+
+            <div className="pt-4 border-t space-y-2">
+              <p className="text-sm font-medium text-foreground">Forgot your password?</p>
+              <p className="text-xs text-muted-foreground">
+                We can email you a reset link instead.
+              </p>
+              <Button variant="outline" onClick={handlePasswordReset}>
+                Send Reset Link
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
