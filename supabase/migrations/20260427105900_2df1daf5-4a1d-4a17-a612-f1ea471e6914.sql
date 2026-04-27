@@ -1,0 +1,1 @@
+ALTER TYPE misc_task_status ADD VALUE IF NOT EXISTS 'granted';
