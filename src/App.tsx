@@ -19,6 +19,8 @@ import HolidayCalendar from "./pages/HolidayCalendar";
 import Grading from "./pages/Grading";
 import Profile from "./pages/Profile";
 import ActivityLog from "./pages/ActivityLog";
+import AdminManagement from "./pages/AdminManagement";
+import AdminSettings from "./pages/AdminSettings";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
@@ -45,7 +47,9 @@ const App = () => (
             <Route path="/misc-tasks" element={<ProtectedRoute><MiscTasks /></ProtectedRoute>} />
             <Route path="/calendar" element={<ProtectedRoute><HolidayCalendar /></ProtectedRoute>} />
             <Route path="/grading" element={<ProtectedRoute><Grading /></ProtectedRoute>} />
-            <Route path="/activity-log" element={<ProtectedRoute><ActivityLog /></ProtectedRoute>} />
+            <Route path="/activity-log" element={<ProtectedRoute adminOnly><ActivityLog /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute adminOnly><AdminManagement /></ProtectedRoute>} />
+            <Route path="/admin-settings" element={<ProtectedRoute adminOnly><AdminSettings /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
