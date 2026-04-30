@@ -47,13 +47,58 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          academic_year: string
+          app_name: string
+          default_class_duration_minutes: number
+          id: string
+          notify_attendance_reminders: boolean
+          notify_holiday_alerts: boolean
+          primary_color: string
+          reminder_time: string
+          singleton: boolean
+          tagline: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          academic_year?: string
+          app_name?: string
+          default_class_duration_minutes?: number
+          id?: string
+          notify_attendance_reminders?: boolean
+          notify_holiday_alerts?: boolean
+          primary_color?: string
+          reminder_time?: string
+          singleton?: boolean
+          tagline?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          academic_year?: string
+          app_name?: string
+          default_class_duration_minutes?: number
+          id?: string
+          notify_attendance_reminders?: boolean
+          notify_holiday_alerts?: boolean
+          primary_color?: string
+          reminder_time?: string
+          singleton?: boolean
+          tagline?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       attendance: {
         Row: {
           class_id: string
           created_at: string
           date: string
           id: string
-          marked_by: string
+          marked_by: string | null
           status: string
           student_id: string
           topic: string | null
@@ -63,7 +108,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
-          marked_by: string
+          marked_by?: string | null
           status: string
           student_id: string
           topic?: string | null
@@ -73,7 +118,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
-          marked_by?: string
+          marked_by?: string | null
           status?: string
           student_id?: string
           topic?: string | null
@@ -158,7 +203,7 @@ export type Database = {
           date: string
           grade_value: string
           id: string
-          marked_by: string
+          marked_by: string | null
           student_id: string
         }
         Insert: {
@@ -167,7 +212,7 @@ export type Database = {
           date?: string
           grade_value: string
           id?: string
-          marked_by: string
+          marked_by?: string | null
           student_id: string
         }
         Update: {
@@ -176,7 +221,7 @@ export type Database = {
           date?: string
           grade_value?: string
           id?: string
-          marked_by?: string
+          marked_by?: string | null
           student_id?: string
         }
         Relationships: [
@@ -199,7 +244,7 @@ export type Database = {
       holidays: {
         Row: {
           created_at: string
-          created_by: string
+          created_by: string | null
           date: string
           description: string | null
           end_date: string | null
@@ -209,7 +254,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by: string
+          created_by?: string | null
           date: string
           description?: string | null
           end_date?: string | null
@@ -219,7 +264,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           date?: string
           description?: string | null
           end_date?: string | null
@@ -241,7 +286,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          marked_by: string
+          marked_by: string | null
           school_id: string
           status: Database["public"]["Enums"]["misc_task_status"]
           task_key: string
@@ -250,7 +295,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          marked_by: string
+          marked_by?: string | null
           school_id: string
           status?: Database["public"]["Enums"]["misc_task_status"]
           task_key: string
@@ -259,7 +304,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          marked_by?: string
+          marked_by?: string | null
           school_id?: string
           status?: Database["public"]["Enums"]["misc_task_status"]
           task_key?: string
@@ -273,7 +318,7 @@ export type Database = {
           created_at: string
           date: string
           id: string
-          marked_by: string
+          marked_by: string | null
           school_id: string
           status: Database["public"]["Enums"]["payment_status"]
           student_id: string
@@ -284,7 +329,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
-          marked_by: string
+          marked_by?: string | null
           school_id: string
           status: Database["public"]["Enums"]["payment_status"]
           student_id: string
@@ -295,7 +340,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
-          marked_by?: string
+          marked_by?: string | null
           school_id?: string
           status?: Database["public"]["Enums"]["payment_status"]
           student_id?: string
@@ -305,6 +350,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           email: string | null
           full_name: string
@@ -313,6 +359,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string
@@ -321,6 +368,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string
@@ -334,7 +382,7 @@ export type Database = {
         Row: {
           address: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
           days: string[] | null
           id: string
           ir_coordinator_mobile: string | null
@@ -349,7 +397,7 @@ export type Database = {
         Insert: {
           address?: string | null
           created_at?: string
-          created_by: string
+          created_by?: string | null
           days?: string[] | null
           id?: string
           ir_coordinator_mobile?: string | null
@@ -364,7 +412,7 @@ export type Database = {
         Update: {
           address?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           days?: string[] | null
           id?: string
           ir_coordinator_mobile?: string | null
@@ -438,7 +486,7 @@ export type Database = {
         Row: {
           class_id: string
           created_at: string
-          created_by: string
+          created_by: string | null
           date: string
           id: string
           topic: string
@@ -446,7 +494,7 @@ export type Database = {
         Insert: {
           class_id: string
           created_at?: string
-          created_by: string
+          created_by?: string | null
           date?: string
           id?: string
           topic: string
@@ -454,7 +502,7 @@ export type Database = {
         Update: {
           class_id?: string
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           date?: string
           id?: string
           topic?: string
@@ -502,7 +550,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "instructor"
+      app_role: "instructor" | "admin"
       misc_task_status: "done" | "pending" | "not_applicable" | "granted"
       payment_status: "paid" | "not_paid"
     }
@@ -632,7 +680,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["instructor"],
+      app_role: ["instructor", "admin"],
       misc_task_status: ["done", "pending", "not_applicable", "granted"],
       payment_status: ["paid", "not_paid"],
     },

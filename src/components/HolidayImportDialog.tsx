@@ -9,7 +9,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { capitalizeFields } from '@/lib/utils';
 import { logActivity } from '@/lib/activityLogger';
 import XLSX from 'xlsx-js-style';
-import { format, parse, isValid } from 'date-fns';
 
 interface HolidayImportDialogProps {
   schools: { id: string; name: string }[];
@@ -25,30 +24,58 @@ const HolidayImportDialog = ({ schools, userId, onImported }: HolidayImportDialo
 
   const downloadTemplate = () => {
     const headers = ['Start Date', 'End Date', 'Event', 'Description'];
-    const sampleRows = [
+    const sampleRows: Array<[string, string, string, string]> = [
       ['2026-01-26', '2026-01-26', 'Republic Day', 'National holiday'],
       ['2026-08-15', '2026-08-15', 'Independence Day', 'National holiday'],
       ['2026-10-12', '2026-10-17', 'Dussehra Break', 'Festival holidays'],
     ];
-    const data = [headers, ...sampleRows];
-    const ws = XLSX.utils.aoa_to_sheet(data);
+    const excelSerialFromIsoDate = (isoDate: string) => {
+      const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return isoDate;
+      const [, y, m, d] = match;
+      const utcMs = Date.UTC(Number(y), Number(m) - 1, Number(d));
+      return utcMs / 86400000 + 25569;
+    };
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
 
+    const thinBorder = {
+      top: { style: 'thin', color: { rgb: '000000' } },
+      bottom: { style: 'thin', color: { rgb: '000000' } },
+      left: { style: 'thin', color: { rgb: '000000' } },
+      right: { style: 'thin', color: { rgb: '000000' } },
+    };
     const headerStyle = {
       fill: { fgColor: { rgb: 'FFD966' } },
       font: { bold: true, color: { rgb: '000000' } },
       alignment: { horizontal: 'center' as const },
-      border: {
-        top: { style: 'thin', color: { rgb: '000000' } },
-        bottom: { style: 'thin', color: { rgb: '000000' } },
-        left: { style: 'thin', color: { rgb: '000000' } },
-        right: { style: 'thin', color: { rgb: '000000' } },
-      },
+      border: thinBorder,
     };
     for (let i = 0; i < headers.length; i++) {
       const ref = XLSX.utils.encode_cell({ r: 0, c: i });
       if (ws[ref]) ws[ref].s = headerStyle;
     }
-    ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 35 }];
+
+    // Write rows with timezone-safe Excel serial dates and plain text cells
+    sampleRows.forEach((row, rIdx) => {
+      const r = rIdx + 1;
+      const dateStyle = { numFmt: 'yyyy-mm-dd', alignment: { horizontal: 'center' as const }, border: thinBorder };
+      const textStyle = { alignment: { horizontal: 'left' as const }, border: thinBorder };
+
+      ws[XLSX.utils.encode_cell({ r, c: 0 })] = { t: 'n', v: excelSerialFromIsoDate(row[0]), z: 'yyyy-mm-dd', s: dateStyle };
+      ws[XLSX.utils.encode_cell({ r, c: 1 })] = { t: 'n', v: excelSerialFromIsoDate(row[1]), z: 'yyyy-mm-dd', s: dateStyle };
+      ws[XLSX.utils.encode_cell({ r, c: 2 })] = { t: 's', v: row[2], s: textStyle };
+      ws[XLSX.utils.encode_cell({ r, c: 3 })] = { t: 's', v: row[3], s: textStyle };
+    });
+
+    // Update sheet range to include all rows
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: sampleRows.length, c: headers.length - 1 } });
+
+    ws['!cols'] = [
+      { wch: 15 }, // Start Date
+      { wch: 15 }, // End Date
+      { wch: 25 }, // Event
+      { wch: 35 }, // Description
+    ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Holidays');
@@ -56,17 +83,37 @@ const HolidayImportDialog = ({ schools, userId, onImported }: HolidayImportDialo
   };
 
   const parseDate = (value: any): string | null => {
-    if (!value) return null;
-    if (value instanceof Date && isValid(value)) {
-      return format(value, 'yyyy-MM-dd');
+    if (value === null || value === undefined || value === '') return null;
+    const toIsoDate = (year: number, month: number, day: number) => {
+      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+      const dt = new Date(Date.UTC(year, month - 1, day));
+      if (dt.getUTCFullYear() !== year || dt.getUTCMonth() !== month - 1 || dt.getUTCDate() !== day) return null;
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    };
+
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return toIsoDate(value.getFullYear(), value.getMonth() + 1, value.getDate());
     }
+
+    if (typeof value === 'number') {
+      const serial = Math.floor(value + 1e-9);
+      const dt = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+      return toIsoDate(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+    }
+
     const str = String(value).trim();
-    const d1 = parse(str, 'yyyy-MM-dd', new Date());
-    if (isValid(d1)) return format(d1, 'yyyy-MM-dd');
-    const d2 = parse(str, 'dd-MM-yyyy', new Date());
-    if (isValid(d2)) return format(d2, 'yyyy-MM-dd');
-    const d3 = parse(str, 'dd/MM/yyyy', new Date());
-    if (isValid(d3)) return format(d3, 'yyyy-MM-dd');
+
+    const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) return toIsoDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+
+    const dmy = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+    if (dmy) {
+      const day = Number(dmy[1]);
+      const month = Number(dmy[2]);
+      const year = Number(dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3]);
+      return toIsoDate(year, month, day);
+    }
+
     return null;
   };
 
@@ -82,7 +129,7 @@ const HolidayImportDialog = ({ schools, userId, onImported }: HolidayImportDialo
     setImporting(true);
     try {
       const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { cellDates: true });
+      const wb = XLSX.read(data, { cellDates: false, cellNF: true, raw: true } as any);
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
 

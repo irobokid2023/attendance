@@ -7,6 +7,17 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // If a password recovery email lands on '/' (default Site URL),
+    // forward the token to the reset page before any session redirect.
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+    const isRecovery =
+      hash.includes('type=recovery') ||
+      new URLSearchParams(search).has('code');
+    if (isRecovery) {
+      navigate(`/reset-password${search}${hash}`, { replace: true });
+      return;
+    }
     if (!loading) {
       navigate(user ? '/dashboard' : '/auth', { replace: true });
     }

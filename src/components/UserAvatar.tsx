@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 interface UserAvatarProps {
   name?: string | null;
   email?: string | null;
+  avatarUrl?: string | null;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
 }
@@ -43,12 +44,13 @@ const sizeClasses = {
   lg: 'h-16 w-16 text-xl',
 };
 
-const UserAvatar = ({ name, email, className, size = 'md' }: UserAvatarProps) => {
+const UserAvatar = ({ name, email, avatarUrl, className, size = 'md' }: UserAvatarProps) => {
   const initials = getInitials(name, email);
   const gradient = getGradient(name || email || '');
 
   return (
     <Avatar className={cn(sizeClasses[size], className)}>
+      {avatarUrl ? <AvatarImage src={avatarUrl} alt={name || email || 'avatar'} /> : null}
       <AvatarFallback className={cn('bg-gradient-to-br text-white font-bold', gradient)}>
         {initials}
       </AvatarFallback>

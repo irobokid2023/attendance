@@ -71,6 +71,7 @@ const Attendance = () => {
   const [newDate, setNewDate] = useState<Date>(new Date());
   const [changingDate, setChangingDate] = useState(false);
   const [holidayMatch, setHolidayMatch] = useState<{ name: string; description: string | null } | null>(null);
+  const [holidayAlertsEnabled, setHolidayAlertsEnabled] = useState(true);
   // Multiple sessions per day
   const [existingSessions, setExistingSessions] = useState<string[]>([]); // list of topics for date
   const [selectedSession, setSelectedSession] = useState<string | null>(null); // topic of session being edited, null = new
@@ -83,8 +84,20 @@ const Attendance = () => {
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
+  // Load app setting for holiday alerts
+  useEffect(() => {
+    supabase
+      .from('app_settings')
+      .select('notify_holiday_alerts')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setHolidayAlertsEnabled(data.notify_holiday_alerts ?? true);
+      });
+  }, []);
+
   // Check if selected date is a holiday for the selected school
   useEffect(() => {
+    if (!holidayAlertsEnabled) { setHolidayMatch(null); return; }
     if (!filterSchool || !dateStr) { setHolidayMatch(null); return; }
     const check = async () => {
       const { data } = await supabase
@@ -99,7 +112,7 @@ const Attendance = () => {
       setHolidayMatch(match ? { name: match.name, description: match.description } : null);
     };
     check();
-  }, [filterSchool, dateStr]);
+  }, [filterSchool, dateStr, holidayAlertsEnabled]);
 
   useEffect(() => {
     Promise.all([

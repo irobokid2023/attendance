@@ -10,18 +10,17 @@ import { cn } from '@/lib/utils';
 import { logActivity } from '@/lib/activityLogger';
 
 const TASKS: { key: string; label: string }[] = [
-  { key: 'agreement_signed', label: 'Agreement Signed & Submitted to Yasmin' },
+  { key: 'agreement_signed', label: 'Agreement Signed' },
   { key: 'calendar_received', label: 'Calendar Received' },
-  { key: 'reception_tv_setup', label: 'Reception TV Video Setup' },
+  { key: 'reception_tv_setup', label: 'Reception TV Video' },
   { key: 'banner_standee', label: 'Banner / Standee Provided' },
-  { key: 'stem_certificates', label: 'STEM Certificates Prepared' },
-  { key: 'posters_provided', label: 'Posters Provided' },
-  { key: 'team_intro', label: 'Team Introduction Completed' },
+  { key: 'stem_certificates_posters', label: 'STEM Certificates and Posters Provided' },
   { key: 'permissions_obtained', label: 'Permissions Obtained' },
   { key: 'staff_birthdates', label: 'School Staff Names and Birthdates' },
-  { key: 'school_magazine', label: 'School Magazine Article Submitted' },
   { key: 'quiz_book_material', label: 'Quiz Book & Take-Home Material Presented' },
   { key: 'photos_videos', label: 'Photos and Videos' },
+  { key: 'curriculum_submitted', label: 'Curriculum Submitted' },
+  { key: 'school_magazine', label: 'School Magazine / Newsletter Article' },
 ];
 
 type Status = 'done' | 'pending' | 'not_applicable' | 'granted';

@@ -14,25 +14,90 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Listen for PASSWORD_RECOVERY event (fires when arriving from reset email)
+    let mounted = true;
+
+    // Listen for PASSWORD_RECOVERY (fires when Supabase parses the recovery hash)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (!mounted) return;
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
         setReady(true);
         setChecking(false);
       }
     });
 
-    // Fallback: if the user already has an active session (e.g. token already
-    // exchanged or they navigated here manually while logged in), allow reset.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-      setChecking(false);
-    });
+    const init = async () => {
+      try {
+        const url = new URL(window.location.href);
+        const hash = window.location.hash.startsWith('#')
+          ? window.location.hash.slice(1)
+          : window.location.hash;
+        const hashParams = new URLSearchParams(hash);
 
-    return () => subscription.unsubscribe();
+        // Surface explicit errors from the email link (expired/invalid)
+        const errorDesc = hashParams.get('error_description') || url.searchParams.get('error_description');
+        const errorCode = hashParams.get('error') || url.searchParams.get('error');
+        if (errorDesc || errorCode) {
+          setErrorMsg(decodeURIComponent(errorDesc || errorCode || 'Invalid or expired link'));
+          setChecking(false);
+          return;
+        }
+
+        // 1) PKCE flow: ?code=...
+        const code = url.searchParams.get('code');
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            setErrorMsg(error.message);
+            setChecking(false);
+            return;
+          }
+          // Clean URL
+          window.history.replaceState({}, '', '/reset-password');
+          setReady(true);
+          setChecking(false);
+          return;
+        }
+
+        // 2) Implicit flow: #access_token=...&type=recovery
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type');
+        if (accessToken && refreshToken && (type === 'recovery' || !type)) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) {
+            setErrorMsg(error.message);
+            setChecking(false);
+            return;
+          }
+          window.history.replaceState({}, '', '/reset-password');
+          setReady(true);
+          setChecking(false);
+          return;
+        }
+
+        // 3) Fallback — already-active session (e.g. PASSWORD_RECOVERY fired before init ran)
+        const { data } = await supabase.auth.getSession();
+        if (data.session) setReady(true);
+        setChecking(false);
+      } catch (err: any) {
+        setErrorMsg(err?.message ?? 'Could not verify reset link');
+        setChecking(false);
+      }
+    };
+
+    init();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,7 +115,9 @@ const ResetPassword = () => {
     if (error) toast.error(error.message);
     else {
       toast.success('Password updated successfully!');
-      navigate('/dashboard');
+      // Sign out so the user logs in with the new password
+      await supabase.auth.signOut();
+      navigate('/auth');
     }
     setLoading(false);
   };
@@ -70,7 +137,7 @@ const ResetPassword = () => {
                 ? 'Verifying reset link...'
                 : ready
                   ? 'Enter your new password below'
-                  : 'This reset link is invalid or expired. Please request a new one.'}
+                  : errorMsg ?? 'This reset link is invalid or expired. Please request a new one.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
