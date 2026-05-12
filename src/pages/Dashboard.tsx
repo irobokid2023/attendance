@@ -114,29 +114,6 @@ const Dashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Today's Breakdown & Trend */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-        <Card className="animate-fade-in shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-foreground">Today's Attendance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-3xl font-bold font-heading text-success">{stats.todayPresent}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 uppercase tracking-wider">Present</p>
-                {totalToday > 0 && <Progress value={(stats.todayPresent / totalToday) * 100} className="mt-3 h-1.5 [&>div]:bg-success" />}
-              </div>
-              <div>
-                <p className="text-3xl font-bold font-heading text-destructive">{stats.todayAbsent}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 uppercase tracking-wider">Absent</p>
-                {totalToday > 0 && <Progress value={(stats.todayAbsent / totalToday) * 100} className="mt-3 h-1.5 [&>div]:bg-destructive" />}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-      </div>
     </DashboardLayout>
   );
 };

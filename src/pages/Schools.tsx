@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, School, BookOpen, Users, ArrowLeft, Trash2, Pencil, LayoutGrid, List, Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { exportSchoolsAsZip } from '@/lib/exportSchoolsZip';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getSchoolColor } from '@/lib/colorCoding';
 import { exportToPdf } from '@/lib/exportPdf';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -45,13 +46,14 @@ const emptyForm: SchoolForm = {
 
 const Schools = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [schools, setSchools] = useState<any[]>([]);
   const [form, setForm] = useState<SchoolForm>(emptyForm);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('newest');
+  const [sort, setSort] = useState('name-asc');
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
   const [classes, setClasses] = useState<any[]>([]);
   const [classesLoading, setClassesLoading] = useState(false);
@@ -130,16 +132,28 @@ const Schools = () => {
 
   const selectedSchool = schools.find((s) => s.id === selectedSchoolId);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const targetId = searchParams.get('schoolId');
+    if (targetId && schools.some((s) => s.id === targetId) && selectedSchoolId !== targetId) {
+      setSelectedSchoolId(targetId);
+      fetchClasses(targetId);
+      const next = new URLSearchParams(searchParams);
+      next.delete('schoolId');
+      setSearchParams(next, { replace: true });
+    }
+  }, [schools, searchParams]);
+
   const filtered = useMemo(() => {
     let result = schools.filter((s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       (s.address ?? '').toLowerCase().includes(search.toLowerCase())
     );
     if (sort === 'name-asc') result.sort((a: any, b: any) => a.name.localeCompare(b.name));
-    else if (sort === 'name-desc') result.sort((a: any, b: any) => b.name.localeCompare(a.name));
-    else if (sort === 'oldest') result.sort((a: any, b: any) => a.created_at.localeCompare(b.created_at));
+    else if (sort === 'students-desc') result.sort((a: any, b: any) => (schoolStats[b.id]?.students ?? 0) - (schoolStats[a.id]?.students ?? 0));
+    else if (sort === 'classes-desc') result.sort((a: any, b: any) => (schoolStats[b.id]?.classes ?? 0) - (schoolStats[a.id]?.classes ?? 0));
     return result;
-  }, [schools, search, sort]);
+  }, [schools, search, sort, schoolStats]);
 
   const setField = (key: keyof SchoolForm, value: any) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -378,7 +392,16 @@ const Schools = () => {
                <TableBody>{classes.map((cls, i) => (
                  <TableRow key={cls.id}>
                    <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                   <TableCell className="font-medium flex items-center gap-2"><BookOpen className="w-4 h-4 text-accent" />{cls.name}</TableCell>
+                   <TableCell className="font-medium">
+                     <button
+                       type="button"
+                        onClick={() => navigate(`/classes?classId=${cls.id}`)}
+                       className="inline-flex items-center gap-2 text-left hover:text-accent hover:underline underline-offset-4 transition-colors"
+                     >
+                       <BookOpen className="w-4 h-4 text-accent" />
+                       {[cls.name, cls.grade, cls.div].filter(Boolean).join(' - ')}
+                     </button>
+                   </TableCell>
                    <TableCell>{cls.day || '—'}</TableCell>
                    <TableCell>{cls.timing || '—'}</TableCell>
                    <TableCell>{cls.instructor_names || '—'}</TableCell>
@@ -443,7 +466,7 @@ const Schools = () => {
       </div>
 
       <SearchFilterBar searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search schools..."
-        sortOptions={[{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'name-asc', label: 'Name A-Z' }, { value: 'name-desc', label: 'Name Z-A' }]}
+        sortOptions={[{ value: 'name-asc', label: 'A to Z' }, { value: 'students-desc', label: 'No. of Students' }, { value: 'classes-desc', label: 'No. of Classes' }]}
         sortValue={sort} onSortChange={setSort} />
 
       {filtered.length === 0 ? (

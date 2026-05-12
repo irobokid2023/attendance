@@ -394,8 +394,15 @@ const Students = () => {
       ) : (
         <>
           {/* Search within results */}
-          <div className="mb-4">
+          <div className="mb-4 flex flex-col sm:flex-row gap-3">
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, grade..." className="max-w-sm" />
+            <Select value={sort} onValueChange={setSort}>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Sort by" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name-asc">A to Z</SelectItem>
+                <SelectItem value="name-desc">Z to A</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="bg-card rounded-xl border overflow-hidden">
             <Table>

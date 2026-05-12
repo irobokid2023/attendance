@@ -16,11 +16,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Plus, BookOpen, School, Users, ArrowLeft, Trash2, Pencil, LayoutGrid, List, Clock, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getSchoolColor } from '@/lib/colorCoding';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { exportToExcel } from '@/lib/exportExcel';
 import { exportToPdf } from '@/lib/exportPdf';
 import ExportDropdown from '@/components/ExportDropdown';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const ROMAN_GRADES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
@@ -117,7 +117,7 @@ const Classes = () => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('newest');
+  const [sort, setSort] = useState('name-asc');
   const [filterSchool, setFilterSchool] = useState('all');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [students, setStudents] = useState<any[]>([]);
@@ -152,6 +152,19 @@ const Classes = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const targetId = searchParams.get('classId');
+    if (targetId && classes.some((c) => c.id === targetId) && selectedClassId !== targetId) {
+      setSelectedClassId(targetId);
+      fetchStudents(targetId);
+      const next = new URLSearchParams(searchParams);
+      next.delete('classId');
+      setSearchParams(next, { replace: true });
+    }
+  }, [classes, searchParams]);
+
   const fetchStudents = useCallback(async (classId: string) => {
     setStudentsLoading(true);
     const { data } = await supabase.from('students').select('*').eq('class_id', classId).order('roll_number', { ascending: true });
@@ -166,10 +179,13 @@ const Classes = () => {
     let result = classes.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()) || (c.schools?.name ?? '').toLowerCase().includes(search.toLowerCase()));
     if (filterSchool !== 'all') result = result.filter((c) => c.school_id === filterSchool);
     if (sort === 'name-asc') result.sort((a: any, b: any) => a.name.localeCompare(b.name));
-    else if (sort === 'name-desc') result.sort((a: any, b: any) => b.name.localeCompare(a.name));
-    else if (sort === 'oldest') result.sort((a: any, b: any) => a.created_at.localeCompare(b.created_at));
+    else if (sort === 'students-desc') result.sort((a: any, b: any) => (studentCounts[b.id] || 0) - (studentCounts[a.id] || 0));
+    else if (sort === 'grade-asc') {
+      const idx = (g: string) => { const i = ROMAN_GRADES.indexOf(g); return i === -1 ? 999 : i; };
+      result.sort((a: any, b: any) => idx(a.grade ?? '') - idx(b.grade ?? ''));
+    }
     return result;
-  }, [classes, search, sort, filterSchool]);
+  }, [classes, search, sort, filterSchool, studentCounts]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, { schoolName: string; classes: any[] }>();
@@ -383,7 +399,7 @@ const Classes = () => {
       <DashboardLayout>
         <div className="page-header flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => { setSelectedClassId(null); setStudents([]); }}><ArrowLeft className="w-5 h-5" /></Button>
-          <div>
+          <div className="flex-1">
             <h1 className="page-title flex items-center gap-2"><BookOpen className="w-5 h-5 text-accent" />{getClassName(selectedClass)}</h1>
             <p className="page-subtitle">{selectedClass.schools?.name ?? 'Unknown School'}</p>
           </div>
@@ -450,6 +466,16 @@ const Classes = () => {
             {schools.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={sort} onValueChange={setSort}>
+          <SelectTrigger className="w-full sm:w-56">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name-asc">A to Z</SelectItem>
+            <SelectItem value="students-desc">No. of Students</SelectItem>
+            <SelectItem value="grade-asc">Grades I - X</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {filterSchool === 'all' ? (
@@ -467,13 +493,13 @@ const Classes = () => {
                   <div className="flex items-center gap-2 mb-4"><School className="w-4.5 h-4.5 text-primary" /><h2 className="text-lg font-heading font-semibold text-foreground">{schoolName}</h2><span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{groupClasses.length}</span></div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {groupClasses.map((cls: any) => (
-                      <Card key={cls.id} className={cn("animate-fade-in hover:shadow-md transition-shadow cursor-pointer relative border-l-4", getSchoolColor(cls.schools?.name || cls.name).border)} onClick={() => handleSelectClass(cls.id)}>
+                      <Card key={cls.id} className={cn("animate-fade-in hover:shadow-md transition-shadow cursor-pointer relative border")} onClick={() => handleSelectClass(cls.id)}>
                         <div className="absolute top-3 right-3 z-10 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Duplicate" onClick={() => handleDuplicate(cls)}><Copy className="w-3.5 h-3.5" /></Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(cls)}><Pencil className="w-3.5 h-3.5" /></Button>
                           <Checkbox checked={selected.has(cls.id)} onCheckedChange={() => toggleSelect(cls.id)} />
                         </div>
-                        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><div className={cn("w-2.5 h-2.5 rounded-full shrink-0", getSchoolColor(cls.schools?.name || cls.name).dot)} /><BookOpen className="w-4 h-4 text-accent" />{getClassName(cls)}</CardTitle></CardHeader>
+                        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><BookOpen className="w-4 h-4 text-accent" />{getClassName(cls)}</CardTitle></CardHeader>
                         <CardContent>
                           <p className="text-sm text-muted-foreground">{cls.schools?.name ?? 'Unknown School'}</p>
                           {(cls.grade || cls.div) && <p className="text-xs text-muted-foreground mt-0.5">Grade: {cls.grade || '—'} • Div: {cls.div || '—'}</p>}
@@ -507,7 +533,7 @@ const Classes = () => {
                   {filtered.map((cls) => (
                     <TableRow key={cls.id} className="cursor-pointer" onClick={() => handleSelectClass(cls.id)}>
                       <TableCell onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(cls.id)} onCheckedChange={() => toggleSelect(cls.id)} /></TableCell>
-                      <TableCell className="font-medium"><div className="flex items-center gap-2"><div className={cn("w-2.5 h-2.5 rounded-full shrink-0", getSchoolColor(cls.schools?.name || cls.name).dot)} /><BookOpen className="w-4 h-4 text-accent" />{getClassName(cls)}</div></TableCell>
+                      <TableCell className="font-medium"><div className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-accent" />{getClassName(cls)}</div></TableCell>
                       <TableCell className="text-muted-foreground">{cls.schools?.name ?? '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{cls.grade || '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{cls.div || '—'}</TableCell>
