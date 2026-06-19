@@ -2,3 +2,9 @@ project_id = "dizwufpchqmaxlbrfmnb"
 
 [functions.admin-users]
 verify_jwt = true
+
+[functions.drive-storage]
+verify_jwt = true
+
+[functions.upload-to-drive]
+verify_jwt = true
