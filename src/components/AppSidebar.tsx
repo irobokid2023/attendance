@@ -16,6 +16,7 @@ import {
   ListChecks,
   ShieldCheck,
   Settings2,
+  Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -29,6 +30,7 @@ const navItems = [
   { to: '/classes', icon: BookOpen, label: 'Classes' },
   { to: '/students', icon: Users, label: 'Students' },
   { to: '/attendance', icon: ClipboardCheck, label: 'Attendance' },
+  { to: '/media', icon: Upload, label: 'Upload Media' },
   { to: '/topics', icon: MessageSquareText, label: 'Topic of the Day' },
   { to: '/payments', icon: IndianRupee, label: 'Payments' },
   { to: '/misc-tasks', icon: ListChecks, label: 'Miscellaneous Tasks' },

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { capitalizeWords } from '@/lib/utils';
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { User, Mail, Save, Trash2, KeyRound, Camera, Loader2 } from 'lucide-react';
+import { User, Mail, Save, Trash2, KeyRound } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -20,11 +20,8 @@ import {
 const Profile = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [deleting, setDeleting] = useState(false);
@@ -37,13 +34,12 @@ const Profile = () => {
       if (!user) return;
       const { data } = await supabase
         .from('profiles')
-        .select('full_name, email, avatar_url')
+        .select('full_name, email')
         .eq('user_id', user.id)
         .maybeSingle();
       if (data) {
         setFullName(data.full_name || '');
         setEmail(data.email || user.email || '');
-        setAvatarUrl(data.avatar_url || null);
       } else {
         setEmail(user.email || '');
       }
@@ -75,70 +71,6 @@ const Profile = () => {
     setLoading(false);
   };
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be smaller than 5MB');
-      return;
-    }
-
-    setUploadingAvatar(true);
-    const ext = file.name.split('.').pop() || 'png';
-    const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(path, file, { upsert: true, cacheControl: '3600' });
-
-    if (uploadError) {
-      toast.error(uploadError.message);
-      setUploadingAvatar(false);
-      return;
-    }
-
-    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
-    const publicUrl = pub.publicUrl;
-
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ avatar_url: publicUrl })
-      .eq('user_id', user.id);
-
-    if (updateError) {
-      toast.error(updateError.message);
-    } else {
-      setAvatarUrl(publicUrl);
-      toast.success('Profile picture updated');
-      logActivity({
-        action: 'updated',
-        section: 'profile',
-        description: 'Updated profile picture',
-      });
-    }
-    setUploadingAvatar(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleRemoveAvatar = async () => {
-    if (!user) return;
-    setUploadingAvatar(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ avatar_url: null })
-      .eq('user_id', user.id);
-    if (error) toast.error(error.message);
-    else {
-      setAvatarUrl(null);
-      toast.success('Profile picture removed');
-    }
-    setUploadingAvatar(false);
-  };
 
   const handlePasswordReset = async () => {
     if (!user?.email) return;
@@ -184,55 +116,13 @@ const Profile = () => {
 
       <div className="max-w-lg space-y-6">
         <div className="flex items-center gap-4 mb-2">
-          <div className="relative group">
-            <UserAvatar name={fullName} email={email} avatarUrl={avatarUrl} size="lg" />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingAvatar}
-              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity disabled:cursor-not-allowed"
-              aria-label="Change profile picture"
-            >
-              {uploadingAvatar ? (
-                <Loader2 className="w-5 h-5 text-white animate-spin" />
-              ) : (
-                <Camera className="w-5 h-5 text-white" />
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarUpload}
-            />
-          </div>
+          <UserAvatar name={fullName} email={email} size="lg" />
           <div className="flex-1">
             <h2 className="font-heading font-bold text-lg text-foreground">{fullName || 'Your Name'}</h2>
             <p className="text-sm text-muted-foreground">{email}</p>
-            <div className="flex gap-2 mt-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingAvatar}
-              >
-                <Camera className="w-3.5 h-3.5 mr-1.5" />
-                {avatarUrl ? 'Change' : 'Upload'}
-              </Button>
-              {avatarUrl && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleRemoveAvatar}
-                  disabled={uploadingAvatar}
-                >
-                  Remove
-                </Button>
-              )}
-            </div>
           </div>
         </div>
+
 
         <Card>
           <CardHeader>

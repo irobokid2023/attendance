@@ -540,7 +540,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_old_activity_logs: { Args: never; Returns: undefined }
       delete_old_topics: { Args: never; Returns: undefined }
+      get_table_sizes: {
+        Args: never
+        Returns: {
+          index_bytes: number
+          row_estimate: number
+          table_bytes: number
+          table_name: string
+          total_bytes: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -138,20 +138,7 @@ const TopicOfTheDay = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Group by class_id to compute session numbers
-      const grouped: Record<string, any[]> = {};
-      (data ?? []).forEach(r => {
-        if (!grouped[r.class_id]) grouped[r.class_id] = [];
-        grouped[r.class_id].push(r);
-      });
-
-      // Add session count per class
-      const enriched = (data ?? []).map(r => ({
-        ...r,
-        totalSessions: grouped[r.class_id]?.length || 0,
-      }));
-
-      setRecords(enriched);
+      setRecords(data ?? []);
     } catch (err: any) {
       toast.error(err.message || 'Failed to fetch records');
     } finally {
@@ -295,7 +282,6 @@ const TopicOfTheDay = () => {
                   'Class Name': r.classes ? getClassName(r.classes) : '-',
                   'Topic Of The Day': r.topic,
                   'Date': formatDate(r.date),
-                  'No. Of Sessions': r.totalSessions,
                 }));
                 exportToExcel({ filename: 'Topic_Of_The_Day.xlsx', sheetName: 'Topics', rows });
                 toast.success('Excel exported successfully');
@@ -320,7 +306,6 @@ const TopicOfTheDay = () => {
                       <TableHead>Class Name</TableHead>
                       <TableHead>Topic Of The Day</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead className="text-center">No. Of Sessions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -333,9 +318,6 @@ const TopicOfTheDay = () => {
                         </TableCell>
                         <TableCell>{r.topic}</TableCell>
                         <TableCell>{formatDate(r.date)}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary">{r.totalSessions}</Badge>
-                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

@@ -288,13 +288,13 @@ const Students = () => {
                     </Select>
                   </div>
                   <div className="space-y-2 col-span-2"><Label>Laptop No.</Label><Input value={form.laptop_no} onChange={(e) => setField('laptop_no', e.target.value)} placeholder="e.g. LP-001" /></div>
-                  <div className="space-y-2"><Label>Grade *</Label><Input value={form.grade} onChange={(e) => setField('grade', e.target.value)} placeholder="e.g. 5" required /></div>
-                  <div className="space-y-2"><Label>Div *</Label><Input value={form.div} onChange={(e) => setField('div', e.target.value)} placeholder="e.g. A" required /></div>
+                  <div className="space-y-2"><Label>Grade {!editId && '*'}</Label><Input value={form.grade} onChange={(e) => setField('grade', e.target.value)} placeholder="e.g. 5" required={!editId} /></div>
+                  <div className="space-y-2"><Label>Div {!editId && '*'}</Label><Input value={form.div} onChange={(e) => setField('div', e.target.value)} placeholder="e.g. A" required={!editId} /></div>
                   <div className="space-y-2"><Label>Parent Email 1</Label><Input type="email" value={form.parent_email_1} onChange={(e) => setField('parent_email_1', e.target.value)} placeholder="parent1@example.com" /></div>
                   <div className="space-y-2"><Label>Parent Mobile 1</Label><Input value={form.parent_mobile_1} onChange={(e) => setField('parent_mobile_1', e.target.value)} placeholder="e.g. 9876543210" /></div>
                   <div className="space-y-2"><Label>Parent Mobile 2</Label><Input value={form.parent_mobile_2} onChange={(e) => setField('parent_mobile_2', e.target.value)} placeholder="e.g. 9876543211" /></div>
                 </div>
-                <Button type="submit" className="w-full" disabled={loading || !form.class_id || !form.grade || !form.div}>{loading ? 'Saving...' : editId ? 'Update Student' : 'Add Student'}</Button>
+                <Button type="submit" className="w-full" disabled={loading || !form.class_id || (!editId && (!form.grade || !form.div))}>{loading ? 'Saving...' : editId ? 'Update Student' : 'Add Student'}</Button>
               </form>
             </DialogContent>
           </Dialog>

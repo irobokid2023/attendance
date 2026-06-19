@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { History, Search } from 'lucide-react';
+import { History, Info, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -30,10 +30,10 @@ const SECTION_LABELS: Record<(typeof SECTIONS)[number], string> = {
 
 const RANGE_OPTIONS = [
   { value: '1', label: 'Last 24 hours' },
-  { value: '7', label: 'Last 7 days' },
-  { value: '14', label: 'Last 14 days' },
-  { value: '30', label: 'Last 30 days' },
+  { value: '2', label: 'Last 2 days' },
+  { value: '3', label: 'Last 3 days' },
 ] as const;
+
 
 const ACTIONS = ['created', 'updated', 'deleted', 'imported', 'duplicated', 'exported'] as const;
 const PAGE_SIZE = 1000;
@@ -176,6 +176,14 @@ const ActivityLogPage = () => {
             <p className="text-muted-foreground text-sm mt-1">Track all actions performed across the platform</p>
           </div>
         </div>
+
+        <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+          <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <span>
+            Activity logs are retained for the <span className="font-semibold text-foreground">last 3 days only</span>. Older entries are automatically deleted every day.
+          </span>
+        </div>
+
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">

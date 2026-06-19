@@ -214,11 +214,13 @@ const Classes = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || form.name === '__custom__') { toast.error('Program Name is required'); return; }
-    if (!form.grade) { toast.error('Grade is required'); return; }
-    if (!form.div) { toast.error('Division is required'); return; }
-    if (!form.day) { toast.error('Day is required'); return; }
-    if (!form.instructor_names.trim()) { toast.error('Instructor Name is required'); return; }
-    if (!form.venue.trim()) { toast.error('Venue is required'); return; }
+    if (!editId) {
+      if (!form.grade) { toast.error('Grade is required'); return; }
+      if (!form.div) { toast.error('Division is required'); return; }
+      if (!form.day) { toast.error('Day is required'); return; }
+      if (!form.instructor_names.trim()) { toast.error('Instructor Name is required'); return; }
+      if (!form.venue.trim()) { toast.error('Venue is required'); return; }
+    }
     setLoading(true);
     const payload = capitalizeFields({ ...form }, ['instructor_names', 'venue']);
     if (editId) {
@@ -379,8 +381,8 @@ const Classes = () => {
         </div>
       </div>
       <div className="space-y-2">
-        <Label>Day *</Label>
-        <Select value={form.day} onValueChange={(v) => setField('day', v)} required>
+        <Label>Day {!editId && '*'}</Label>
+        <Select value={form.day} onValueChange={(v) => setField('day', v)} required={!editId}>
           <SelectTrigger><SelectValue placeholder="Select day" /></SelectTrigger>
           <SelectContent>{DAYS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
         </Select>
@@ -389,8 +391,8 @@ const Classes = () => {
       <div className="grid grid-cols-1 gap-3">
         <div className="space-y-2"><Label>No. of Sessions *</Label><Input type="number" value={form.num_sessions} onChange={(e) => setField('num_sessions', parseInt(e.target.value) || 0)} required /></div>
       </div>
-      <div className="space-y-2"><Label>Instructors Name *</Label><Input value={form.instructor_names} onChange={(e) => setField('instructor_names', e.target.value)} placeholder="e.g. Mr. Smith, Ms. Jones" required /></div>
-      <div className="space-y-2"><Label>Class Venue *</Label><Input value={form.venue} onChange={(e) => setField('venue', e.target.value)} placeholder="e.g. Room 201" required /></div>
+      <div className="space-y-2"><Label>Instructors Name {!editId && '*'}</Label><Input value={form.instructor_names} onChange={(e) => setField('instructor_names', e.target.value)} placeholder="e.g. Mr. Smith, Ms. Jones" required={!editId} /></div>
+      <div className="space-y-2"><Label>Class Venue {!editId && '*'}</Label><Input value={form.venue} onChange={(e) => setField('venue', e.target.value)} placeholder="e.g. Room 201" required={!editId} /></div>
     </div>
   );
 

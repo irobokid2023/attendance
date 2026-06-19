@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +15,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { ShieldCheck, KeyRound, Trash2, Search, Users, BarChart3 } from 'lucide-react';
+import { ShieldCheck, KeyRound, Trash2, Search, Users, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
 import UsageAnalytics from '@/components/UsageAnalytics';
 
 interface AdminUser {
@@ -54,6 +54,8 @@ const AdminManagement = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const load = async () => {
     setLoading(true);
@@ -106,10 +108,16 @@ const AdminManagement = () => {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const filtered = users.filter(u =>
+  const filtered = useMemo(() => users.filter(u =>
     u.email?.toLowerCase().includes(search.toLowerCase()) ||
     u.full_name?.toLowerCase().includes(search.toLowerCase())
-  );
+  ), [users, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [search]);
 
   return (
     <DashboardLayout>
@@ -148,7 +156,7 @@ const AdminManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map(u => {
+                  {paginated.map(u => {
                     const isBanned = u.banned_until && new Date(u.banned_until) > new Date();
                     const isSelf = u.id === user?.id;
                     return (
@@ -205,6 +213,22 @@ const AdminManagement = () => {
                   )}
                 </TableBody>
               </Table>
+            )}
+            {!loading && filtered.length > 0 && (
+              <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                <p className="text-xs text-muted-foreground">
+                  Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                    <ChevronLeft className="w-4 h-4" /> Previous
+                  </Button>
+                  <span className="text-xs text-muted-foreground tabular-nums">Page {currentPage} of {totalPages}</span>
+                  <Button size="sm" variant="outline" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                    Next <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

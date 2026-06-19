@@ -45,13 +45,16 @@ const Dashboard = () => {
 
 
     const fetchHolidays = async () => {
-      const today = new Date().toISOString().split('T')[0];
+      const todayDate = new Date();
+      const today = todayDate.toISOString().split('T')[0];
+      const in30 = new Date(todayDate.getTime() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString().split('T')[0];
       const { data } = await supabase
         .from('holidays')
         .select('*, schools(name)')
         .gte('date', today)
-        .order('date')
-        .limit(50);
+        .lte('date', in30)
+        .order('date');
       setUpcomingHolidays(data ?? []);
     };
 
@@ -89,13 +92,14 @@ const Dashboard = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
             <CalendarDays className="w-4 h-4 text-primary" /> Upcoming Holidays
+            <span className="text-xs font-normal text-muted-foreground ml-1">(next 30 days)</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           {upcomingHolidays.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scroll-smooth">
               {upcomingHolidays.map(h => (
-                <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
+                <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors shrink-0 w-[280px] snap-start">
                   <div className="text-center min-w-[48px] rounded-lg bg-primary/10 p-2">
                     <p className="text-[10px] font-semibold text-primary uppercase tracking-wide">{format(parseISO(h.date), 'MMM')}</p>
                     <p className="text-lg font-bold text-primary leading-tight">{format(parseISO(h.date), 'dd')}</p>
@@ -109,10 +113,11 @@ const Dashboard = () => {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-8">No upcoming holidays</p>
+            <p className="text-sm text-muted-foreground text-center py-8">No holidays in the next 30 days</p>
           )}
         </CardContent>
       </Card>
+
 
     </DashboardLayout>
   );

@@ -179,8 +179,12 @@ const Schools = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    if (form.days.length === 0) { toast.error('Please select at least one day'); return; }
-    if (!form.ir_coordinator_name.trim()) { toast.error('IR Coordinator Name is required'); return; }
+    if (!form.name.trim()) { toast.error('School name is required'); return; }
+    if (!editId) {
+      if (form.days.length === 0) { toast.error('Please select at least one day'); return; }
+      if (!form.ir_coordinator_name.trim()) { toast.error('IR Coordinator Name is required'); return; }
+    }
+    
     
     setLoading(true);
     const payload = capitalizeFields({ ...form }, ['name', 'address', 'ir_coordinator_name', 'primary_coordinator_name', 'secondary_coordinator_name']);
@@ -338,7 +342,7 @@ const Schools = () => {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2"><Label>IR Coordinator Name *</Label><Input value={form.ir_coordinator_name} onChange={(e) => setField('ir_coordinator_name', e.target.value)} required /></div>
+        <div className="space-y-2"><Label>IR Coordinator Name {!editId && '*'}</Label><Input value={form.ir_coordinator_name} onChange={(e) => setField('ir_coordinator_name', e.target.value)} required={!editId} /></div>
         <div className="space-y-2"><Label>IR Coordinator Mobile No.</Label><Input value={form.ir_coordinator_mobile} onChange={(e) => setField('ir_coordinator_mobile', e.target.value)} /></div>
       </div>
       <div className="grid grid-cols-2 gap-3">
