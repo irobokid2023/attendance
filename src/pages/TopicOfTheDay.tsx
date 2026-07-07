@@ -13,10 +13,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { CalendarIcon, Download, FileText, Plus, Search } from 'lucide-react';
+import { CalendarIcon, Download, FileText, Plus, Search, BookOpen, Trash2, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { exportToExcel } from '@/lib/exportExcel';
+import CurriculumImportDialog from '@/components/CurriculumImportDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+
 
 const capitalize = (str: string) =>
   str ? str.replace(/\b\w/g, c => c.toUpperCase()) : str;
@@ -29,7 +33,13 @@ const getClassName = (cls: any): string => {
 };
 
 const TopicOfTheDay = () => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isAdmin = role === 'admin';
+  // Edit record dialog state
+  const [editRec, setEditRec] = useState<any | null>(null);
+  const [editRecText, setEditRecText] = useState('');
+  const [savingEditRec, setSavingEditRec] = useState(false);
+
   const [schools, setSchools] = useState<any[]>([]);
   const [allClasses, setAllClasses] = useState<any[]>([]);
 
@@ -51,6 +61,40 @@ const TopicOfTheDay = () => {
   const [recDateFromOpen, setRecDateFromOpen] = useState(false);
   const [recDateToOpen, setRecDateToOpen] = useState(false);
 
+  // Curriculum state
+  const PROGRAMS = [
+    'Advance Python Programming',
+    'App Inventor (MIT)',
+    'Arduino Electronics and Programming',
+    'Arduino Robotics',
+    'Coding (Scratch)',
+    'Coding AI/Applied AI (Pictoblox)',
+    'Electrics and Circuits (Breadboard Kit)',
+    'Electrics and Circuits (Snap Kit)',
+    'Lego Robotics - Ev3',
+    'Lego Robotics - NxT',
+    'Python Programming',
+    'Robotics and AI',
+    'STEM Explorers',
+    'Young Engineers',
+  ];
+  const [curriculum, setCurriculum] = useState<any[]>([]);
+  const [curProgram, setCurProgram] = useState('');
+  const [curSession, setCurSession] = useState<string>('');
+  const [curTopic, setCurTopic] = useState('');
+  const [savingCurriculum, setSavingCurriculum] = useState(false);
+  const [curFilterProgram, setCurFilterProgram] = useState('__all__');
+
+  const loadCurriculum = async () => {
+    const { data, error } = await (supabase as any)
+      .from('curriculum')
+      .select('*')
+      .order('program_name', { ascending: true })
+      .order('session_no', { ascending: true });
+    if (error) { toast.error(error.message); return; }
+    setCurriculum(data ?? []);
+  };
+
   useEffect(() => {
     Promise.all([
       supabase.from('schools').select('id, name').order('name'),
@@ -59,7 +103,53 @@ const TopicOfTheDay = () => {
       setSchools(schoolsRes.data ?? []);
       setAllClasses(classesRes.data ?? []);
     });
+    loadCurriculum();
   }, []);
+
+  const handleAddCurriculum = async () => {
+    if (!curProgram || !curSession || !curTopic.trim()) {
+      toast.error('Program, Session No. and Topic Name are all required');
+      return;
+    }
+    const sessionNum = parseInt(curSession, 10);
+    if (isNaN(sessionNum) || sessionNum <= 0) {
+      toast.error('Session No. must be a positive number');
+      return;
+    }
+    setSavingCurriculum(true);
+    const { error } = await (supabase as any).from('curriculum').upsert(
+      {
+        program_name: curProgram,
+        session_no: sessionNum,
+        topic_name: capitalize(curTopic.trim()),
+        created_by: user?.id || null,
+      },
+      { onConflict: 'program_name,session_no' }
+    );
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('Curriculum entry saved');
+      logActivity({ action: 'created', section: 'curriculum', description: `Added curriculum: ${curProgram} — Session ${sessionNum}` });
+      setCurTopic('');
+      setCurSession('');
+      loadCurriculum();
+    }
+    setSavingCurriculum(false);
+  };
+
+  const handleDeleteCurriculum = async (id: string) => {
+    const { error } = await (supabase as any).from('curriculum').delete().eq('id', id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Curriculum entry deleted');
+    loadCurriculum();
+  };
+
+  const filteredCurriculum = useMemo(() => {
+    if (curFilterProgram === '__all__') return curriculum;
+    return curriculum.filter(c => c.program_name === curFilterProgram);
+  }, [curriculum, curFilterProgram]);
+
 
   const filteredClasses = useMemo(() => {
     if (!filterSchool) return [];
@@ -164,7 +254,10 @@ const TopicOfTheDay = () => {
             <Plus className="w-3.5 h-3.5" /> Add Topic
           </TabsTrigger>
           <TabsTrigger value="records" className="flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5" /> View Records
+            <FileText className="w-3.5 h-3.5" /> Record
+          </TabsTrigger>
+          <TabsTrigger value="curriculum" className="flex items-center gap-1.5">
+            <BookOpen className="w-3.5 h-3.5" /> Curriculum
           </TabsTrigger>
         </TabsList>
 
@@ -306,6 +399,7 @@ const TopicOfTheDay = () => {
                       <TableHead>Class Name</TableHead>
                       <TableHead>Topic Of The Day</TableHead>
                       <TableHead>Date</TableHead>
+                      <TableHead className="w-24 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -318,6 +412,38 @@ const TopicOfTheDay = () => {
                         </TableCell>
                         <TableCell>{r.topic}</TableCell>
                         <TableCell>{formatDate(r.date)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditRec(r); setEditRecText(r.topic ?? ''); }}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete this topic?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This removes the topic for {r.classes ? getClassName(r.classes) : 'class'} on {formatDate(r.date)}.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={async () => {
+                                    const { error } = await supabase.from('topics').delete().eq('id', r.id);
+                                    if (error) { toast.error(error.message); return; }
+                                    toast.success('Topic deleted');
+                                    logActivity({ action: 'deleted', section: 'topics', description: `Deleted topic on ${r.date}` });
+                                    fetchRecords();
+                                  }}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -326,6 +452,7 @@ const TopicOfTheDay = () => {
             </>
           )}
 
+
           {records.length === 0 && !loadingRecords && (
             <div className="text-center py-20">
               <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -333,9 +460,130 @@ const TopicOfTheDay = () => {
             </div>
           )}
         </TabsContent>
+
+        {/* CURRICULUM TAB */}
+        <TabsContent value="curriculum">
+          {isAdmin && (
+            <div className="bg-card rounded-xl border p-6 max-w-2xl mb-6">
+              <h3 className="font-heading font-semibold mb-4">Add Curriculum</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <Label className="mb-1.5 block">Program Name</Label>
+                  <Select value={curProgram} onValueChange={setCurProgram}>
+                    <SelectTrigger><SelectValue placeholder="Select program" /></SelectTrigger>
+                    <SelectContent>
+                      {PROGRAMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="mb-1.5 block">Session No.</Label>
+                  <Input type="number" min={1} value={curSession} onChange={e => setCurSession(e.target.value)} placeholder="e.g. 1" />
+                </div>
+              </div>
+              <div className="mb-4">
+                <Label className="mb-1.5 block">Topic Name</Label>
+                <Input value={curTopic} onChange={e => setCurTopic(e.target.value)} placeholder="Enter topic name" />
+              </div>
+              <Button onClick={handleAddCurriculum} disabled={savingCurriculum}>
+                {savingCurriculum ? 'Saving...' : 'Add Curriculum'}
+              </Button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-3 max-w-sm flex-1">
+              <Label className="whitespace-nowrap">Filter by Program:</Label>
+              <Select value={curFilterProgram} onValueChange={setCurFilterProgram}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Programs</SelectItem>
+                  {PROGRAMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {isAdmin && <CurriculumImportDialog programs={PROGRAMS} userId={user?.id ?? ''} onImported={loadCurriculum} />}
+          </div>
+
+
+          {filteredCurriculum.length > 0 ? (
+            <>
+              <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1.5 mb-4 w-fit">
+                Total Entries: {filteredCurriculum.length}
+              </Badge>
+              <div className="bg-card rounded-xl border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Program Name</TableHead>
+                      <TableHead className="w-28">Session No.</TableHead>
+                      <TableHead>Topic Name</TableHead>
+                      <TableHead className="w-16"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCurriculum.map((c, i) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell className="font-medium">{c.program_name}</TableCell>
+                        <TableCell>{c.session_no}</TableCell>
+                        <TableCell>{c.topic_name}</TableCell>
+                        <TableCell>
+                          {isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteCurriculum(c.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-20">
+              <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No curriculum entries yet.</p>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
+
+      <Dialog open={!!editRec} onOpenChange={o => !o && setEditRec(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Topic</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              {editRec && `${(editRec.classes as any)?.schools?.name ?? ''} — ${editRec.classes ? getClassName(editRec.classes) : ''} — ${formatDate(editRec.date)}`}
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Topic</Label>
+              <Input value={editRecText} onChange={e => setEditRecText(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditRec(null)}>Cancel</Button>
+            <Button disabled={savingEditRec || !editRecText.trim()} onClick={async () => {
+              if (!editRec) return;
+              setSavingEditRec(true);
+              const newTopic = capitalize(editRecText.trim());
+              const { error } = await supabase.from('topics').update({ topic: newTopic }).eq('id', editRec.id);
+              if (error) { toast.error(error.message); setSavingEditRec(false); return; }
+              toast.success('Topic updated');
+              logActivity({ action: 'updated', section: 'topics', description: `Updated topic on ${editRec.date}` });
+              setEditRec(null); setSavingEditRec(false); fetchRecords();
+            }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
+
 };
 
 export default TopicOfTheDay;

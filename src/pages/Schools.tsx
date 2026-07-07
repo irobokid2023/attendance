@@ -29,6 +29,7 @@ interface SchoolForm {
   name: string;
   address: string;
   days: string[];
+  transport_mode: string;
   ir_coordinator_name: string;
   ir_coordinator_mobile: string;
   primary_coordinator_name: string;
@@ -38,7 +39,7 @@ interface SchoolForm {
 }
 
 const emptyForm: SchoolForm = {
-  name: '', address: '', days: [],
+  name: '', address: '', days: [], transport_mode: '',
   ir_coordinator_name: '', ir_coordinator_mobile: '',
   primary_coordinator_name: '', primary_coordinator_mobile: '',
   secondary_coordinator_name: '', secondary_coordinator_mobile: '',
@@ -66,31 +67,23 @@ const Schools = () => {
   const [schoolStats, setSchoolStats] = useState<Record<string, { classes: number; students: number; sessionsConducted: number; totalSessions: number }>>({});
 
   const fetchSchools = async () => {
-    const [schoolsData, classesData, studentsData, attendanceData] = await Promise.all([
+    // List view only needs school info + per-school class/student counts.
+    // Attendance is heavy (10k+ rows) — fetch it lazily inside fetchClasses().
+    const [schoolsData, classesData, studentsData] = await Promise.all([
       fetchAllPaginated<any>(() => supabase.from('schools').select('*').order('created_at', { ascending: false })),
       fetchAllPaginated<{ id: string; school_id: string; num_sessions: number | null }>(() => supabase.from('classes').select('id, school_id, num_sessions')),
       fetchAllPaginated<{ id: string; class_id: string }>(() => supabase.from('students').select('id, class_id')),
-      fetchAllAttendanceSessions(),
     ]);
     setSchools(schoolsData);
 
-    // Build class_id -> school_id map
     const classSchoolMap: Record<string, string> = {};
     classesData.forEach((c) => { classSchoolMap[c.id] = c.school_id; });
-
-    // Count unique date|topic combinations per class for sessions conducted
-    const classSessionsConducted: Record<string, Set<string>> = {};
-    attendanceData.forEach((a: any) => {
-      if (!classSessionsConducted[a.class_id]) classSessionsConducted[a.class_id] = new Set();
-      classSessionsConducted[a.class_id].add(`${a.date}|${a.topic || ''}`);
-    });
 
     const stats: Record<string, { classes: number; students: number; sessionsConducted: number; totalSessions: number }> = {};
     schoolsData.forEach((s) => { stats[s.id] = { classes: 0, students: 0, sessionsConducted: 0, totalSessions: 0 }; });
     classesData.forEach((c) => {
       if (stats[c.school_id]) {
         stats[c.school_id].classes++;
-        stats[c.school_id].sessionsConducted += classSessionsConducted[c.id]?.size ?? 0;
         stats[c.school_id].totalSessions += c.num_sessions ?? 0;
       }
     });
@@ -168,7 +161,7 @@ const Schools = () => {
   const openEditDialog = (school: any) => {
     setEditId(school.id);
     setForm({
-      name: school.name, address: school.address ?? '', days: school.days ?? [],
+      name: school.name, address: school.address ?? '', days: school.days ?? [], transport_mode: school.transport_mode ?? '',
       ir_coordinator_name: school.ir_coordinator_name ?? '', ir_coordinator_mobile: school.ir_coordinator_mobile ?? '',
       primary_coordinator_name: school.primary_coordinator_name ?? '', primary_coordinator_mobile: school.primary_coordinator_mobile ?? '',
       secondary_coordinator_name: school.secondary_coordinator_name ?? '', secondary_coordinator_mobile: school.secondary_coordinator_mobile ?? '',
@@ -352,6 +345,10 @@ const Schools = () => {
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2"><Label>Secondary Coordinator Name</Label><Input value={form.secondary_coordinator_name} onChange={(e) => setField('secondary_coordinator_name', e.target.value)} /></div>
         <div className="space-y-2"><Label>Secondary Coordinator Mobile</Label><Input value={form.secondary_coordinator_mobile} onChange={(e) => setField('secondary_coordinator_mobile', e.target.value)} /></div>
+      </div>
+      <div className="space-y-2">
+        <Label>Transport Mode</Label>
+        <Input value={form.transport_mode} onChange={(e) => setField('transport_mode', e.target.value)} placeholder="e.g. School Bus, Own Vehicle" />
       </div>
     </div>
   );

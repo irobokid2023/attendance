@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   Settings2,
   Upload,
+  CalendarClock,
+  Users2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -26,9 +28,7 @@ import { useState, useEffect } from 'react';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/schools', icon: School, label: 'Schools' },
-  { to: '/classes', icon: BookOpen, label: 'Classes' },
-  { to: '/students', icon: Users, label: 'Students' },
+  { to: '/manage', icon: School, label: 'Schools / Classes / Students' },
   { to: '/attendance', icon: ClipboardCheck, label: 'Attendance' },
   { to: '/media', icon: Upload, label: 'Upload Media' },
   { to: '/topics', icon: MessageSquareText, label: 'Topic of the Day' },
@@ -40,10 +40,13 @@ const navItems = [
 ];
 
 const adminNavItems = [
+  { to: '/schedule', icon: CalendarClock, label: 'Instructor Schedule' },
+  { to: '/instructor-attendance', icon: Users2, label: 'Instructor Attendance' },
   { to: '/activity-log', icon: History, label: 'Activity Log' },
   { to: '/admin', icon: ShieldCheck, label: 'Admin Management' },
   { to: '/admin-settings', icon: Settings2, label: 'Admin Settings' },
 ];
+
 
 const SidebarContent = ({ user, signOut, onNavClick, role }: { user: any; signOut: () => void; onNavClick?: () => void; role: string | null }) => {
   const location = useLocation();

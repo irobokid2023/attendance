@@ -291,14 +291,12 @@ const Classes = () => {
       <div className="space-y-2">
         <Label>Program Name *</Label>
         {form.name === '__custom__' || (form.name && ![
-          '3D - Designing and Printing',
-          '3D - Designing and Printing + Drone',
           'Advance Python Programming',
-          'App Inventor',
+          'App Inventor (MIT)',
           'Arduino Electronics and Programming',
           'Arduino Robotics',
           'Coding (Scratch)',
-          'Coding AI / Applied AI',
+          'Coding AI/Applied AI (Pictoblox)',
           'Electrics and Circuits (Breadboard Kit)',
           'Electrics and Circuits (Snap Kit)',
           'Lego Robotics - Ev3',
@@ -316,14 +314,12 @@ const Classes = () => {
           <Select value={form.name} onValueChange={(v) => { if (v === '__custom__') setField('name', '__custom__'); else setField('name', v); }}>
             <SelectTrigger><SelectValue placeholder="Select program" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="3D - Designing and Printing">3D - Designing and Printing</SelectItem>
-              <SelectItem value="3D - Designing and Printing + Drone">3D - Designing and Printing + Drone</SelectItem>
               <SelectItem value="Advance Python Programming">Advance Python Programming</SelectItem>
-              <SelectItem value="App Inventor">App Inventor</SelectItem>
+              <SelectItem value="App Inventor (MIT)">App Inventor (MIT)</SelectItem>
               <SelectItem value="Arduino Electronics and Programming">Arduino Electronics and Programming</SelectItem>
               <SelectItem value="Arduino Robotics">Arduino Robotics</SelectItem>
               <SelectItem value="Coding (Scratch)">Coding (Scratch)</SelectItem>
-              <SelectItem value="Coding AI / Applied AI">Coding AI / Applied AI</SelectItem>
+              <SelectItem value="Coding AI/Applied AI (Pictoblox)">Coding AI/Applied AI (Pictoblox)</SelectItem>
               <SelectItem value="Electrics and Circuits (Breadboard Kit)">Electrics and Circuits (Breadboard Kit)</SelectItem>
               <SelectItem value="Electrics and Circuits (Snap Kit)">Electrics and Circuits (Snap Kit)</SelectItem>
               <SelectItem value="Lego Robotics - Ev3">Lego Robotics - Ev3</SelectItem>

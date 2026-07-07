@@ -146,12 +146,13 @@ const Attendance = () => {
     }
 
     const fetchAll = async () => {
-      const [studentsRes, allRecords, dateAttendanceRes] = await Promise.all([
+      const [studentsRes, allRecords, dateAttendanceRes, dayTopicRes] = await Promise.all([
         supabase.from('students').select('*').eq('class_id', filterClass).order('full_name'),
         fetchAllPaginated<{ student_id: string; date: string; status: string; topic: string | null }>(
           () => supabase.from('attendance').select('student_id, date, status, topic').eq('class_id', filterClass),
         ),
         supabase.from('attendance').select('student_id, status, topic').eq('class_id', filterClass).eq('date', dateStr),
+        supabase.from('topics').select('topic').eq('class_id', filterClass).eq('date', dateStr).maybeSingle(),
       ]);
 
       setStudents(studentsRes.data ?? []);
@@ -171,6 +172,8 @@ const Attendance = () => {
       const topics = [...topicSet];
       setExistingSessions(topics);
 
+      const suggestedTopic = (dayTopicRes.data as any)?.topic || '';
+
       if (topics.length > 0 && !isNewSession) {
         // Load first session by default
         const firstTopic = topics[0];
@@ -182,18 +185,19 @@ const Attendance = () => {
         });
         setAttendance(existing);
       } else if (isNewSession) {
-        // New session mode - clear
+        // New session mode - prefill topic from Topic of the Day if set
         setAttendance({});
-        setTopic('');
+        setTopic(suggestedTopic);
       } else {
         setSelectedSession(null);
         setAttendance({});
-        setTopic('');
+        setTopic(suggestedTopic);
       }
     };
 
     fetchAll();
   }, [filterClass, dateStr]);
+
 
   // Load specific session when user selects one
   const loadSession = async (sessionTopic: string) => {
@@ -308,7 +312,12 @@ const Attendance = () => {
     }
 
     const { error } = await supabase.from('attendance').insert(records);
+    // Also mirror the topic into the topics table so Topic of the Day stays in sync
+    await supabase
+      .from('topics')
+      .upsert({ class_id: filterClass, date: dateStr, topic: trimmedTopic, created_by: user.id }, { onConflict: 'class_id,date' });
     if (error) toast.error(error.message);
+
     else {
       toast.success('Attendance saved!');
       const cls = allClasses.find(c => c.id === filterClass);

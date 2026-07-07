@@ -196,6 +196,36 @@ export type Database = {
           },
         ]
       }
+      curriculum: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          program_name: string
+          session_no: number
+          topic_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          program_name: string
+          session_no: number
+          topic_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          program_name?: string
+          session_no?: number
+          topic_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       grading: {
         Row: {
           class_id: string
@@ -282,6 +312,57 @@ export type Database = {
           },
         ]
       }
+      instructor_attendance: {
+        Row: {
+          check_in_at: string | null
+          check_in_lat: number | null
+          check_in_lng: number | null
+          check_out_at: string | null
+          check_out_lat: number | null
+          check_out_lng: number | null
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          instructor_id: string
+          location: string | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          check_in_at?: string | null
+          check_in_lat?: number | null
+          check_in_lng?: number | null
+          check_out_at?: string | null
+          check_out_lat?: number | null
+          check_out_lng?: number | null
+          created_at?: string
+          created_by?: string | null
+          date: string
+          id?: string
+          instructor_id: string
+          location?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          check_in_at?: string | null
+          check_in_lat?: number | null
+          check_in_lng?: number | null
+          check_out_at?: string | null
+          check_out_lat?: number | null
+          check_out_lng?: number | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          instructor_id?: string
+          location?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       misc_tasks: {
         Row: {
           created_at: string
@@ -309,6 +390,59 @@ export type Database = {
           status?: Database["public"]["Enums"]["misc_task_status"]
           task_key?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      notification_reads: {
+        Row: {
+          notification_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          notification_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          notification_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_reads_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          id: string
+          message: string | null
+          title: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message?: string | null
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message?: string | null
+          title?: string
         }
         Relationships: []
       }
@@ -392,6 +526,7 @@ export type Database = {
           primary_coordinator_name: string | null
           secondary_coordinator_mobile: string | null
           secondary_coordinator_name: string | null
+          transport_mode: string | null
           updated_at: string
         }
         Insert: {
@@ -407,6 +542,7 @@ export type Database = {
           primary_coordinator_name?: string | null
           secondary_coordinator_mobile?: string | null
           secondary_coordinator_name?: string | null
+          transport_mode?: string | null
           updated_at?: string
         }
         Update: {
@@ -422,6 +558,7 @@ export type Database = {
           primary_coordinator_name?: string | null
           secondary_coordinator_mobile?: string | null
           secondary_coordinator_name?: string | null
+          transport_mode?: string | null
           updated_at?: string
         }
         Relationships: []

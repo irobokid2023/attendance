@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Schools from "./pages/Schools";
 import Classes from "./pages/Classes";
 import Students from "./pages/Students";
+import Manage from "./pages/Manage";
 import Attendance from "./pages/Attendance";
 import MediaUpload from "./pages/MediaUpload";
 import TopicOfTheDay from "./pages/TopicOfTheDay";
@@ -23,6 +24,8 @@ import Profile from "./pages/Profile";
 import ActivityLog from "./pages/ActivityLog";
 import AdminManagement from "./pages/AdminManagement";
 import AdminSettings from "./pages/AdminSettings";
+import AdminSchedule from "./pages/AdminSchedule";
+import InstructorAttendance from "./pages/InstructorAttendance";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
@@ -44,6 +47,7 @@ const App = () => (
             <Route path="/schools" element={<ProtectedRoute><Schools /></ProtectedRoute>} />
             <Route path="/classes" element={<ProtectedRoute><Classes /></ProtectedRoute>} />
             <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
+            <Route path="/manage" element={<ProtectedRoute><Manage /></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
             <Route path="/media" element={<ProtectedRoute><MediaUpload /></ProtectedRoute>} />
             <Route path="/topics" element={<ProtectedRoute><TopicOfTheDay /></ProtectedRoute>} />
@@ -54,6 +58,8 @@ const App = () => (
             <Route path="/activity-log" element={<ProtectedRoute adminOnly><ActivityLog /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><AdminManagement /></ProtectedRoute>} />
             <Route path="/admin-settings" element={<ProtectedRoute adminOnly><AdminSettings /></ProtectedRoute>} />
+            <Route path="/schedule" element={<ProtectedRoute adminOnly><AdminSchedule /></ProtectedRoute>} />
+            <Route path="/instructor-attendance" element={<ProtectedRoute adminOnly><InstructorAttendance /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

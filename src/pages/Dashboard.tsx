@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchAllPaginated } from '@/lib/fetchAllAttendance';
 import { isAttended } from '@/lib/attendanceUtils';
+import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
 import OnboardingTour from '@/components/OnboardingTour';
 import StatCard from '@/components/StatCard';
@@ -13,6 +14,8 @@ import { format, parseISO } from 'date-fns';
 
 
 const Dashboard = () => {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
   const [stats, setStats] = useState({ schools: 0, classes: 0, students: 0, todayPresent: 0, todayAbsent: 0 });
   const [upcomingHolidays, setUpcomingHolidays] = useState<any[]>([]);
 
@@ -49,11 +52,12 @@ const Dashboard = () => {
       const today = todayDate.toISOString().split('T')[0];
       const in30 = new Date(todayDate.getTime() + 30 * 24 * 60 * 60 * 1000)
         .toISOString().split('T')[0];
+      // Include holidays whose range overlaps today..today+30, not only those starting in-range.
       const { data } = await supabase
         .from('holidays')
         .select('*, schools(name)')
-        .gte('date', today)
         .lte('date', in30)
+        .or(`end_date.gte.${today},and(end_date.is.null,date.gte.${today})`)
         .order('date');
       setUpcomingHolidays(data ?? []);
     };
@@ -79,11 +83,11 @@ const Dashboard = () => {
         <p className="page-subtitle">Overview of your institute's attendance</p>
       </div>
 
-      {/* Top Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard title="Schools" value={stats.schools} icon={School} variant="primary" />
-        <StatCard title="Classes" value={stats.classes} icon={BookOpen} variant="accent" />
-        <StatCard title="Students" value={stats.students} icon={Users} variant="success" />
+      {/* Top Stats — schools/classes/students hidden for non-admin */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-1 max-w-sm'} gap-4 mb-8`}>
+        {isAdmin && <StatCard title="Schools" value={stats.schools} icon={School} variant="primary" />}
+        {isAdmin && <StatCard title="Classes" value={stats.classes} icon={BookOpen} variant="accent" />}
+        {isAdmin && <StatCard title="Students" value={stats.students} icon={Users} variant="success" />}
         <StatCard title="Attendance Rate" value={`${attendanceRate}%`} icon={TrendingUp} variant="warning" />
       </div>
 
@@ -98,19 +102,27 @@ const Dashboard = () => {
         <CardContent>
           {upcomingHolidays.length > 0 ? (
             <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scroll-smooth">
-              {upcomingHolidays.map(h => (
-                <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors shrink-0 w-[280px] snap-start">
-                  <div className="text-center min-w-[48px] rounded-lg bg-primary/10 p-2">
-                    <p className="text-[10px] font-semibold text-primary uppercase tracking-wide">{format(parseISO(h.date), 'MMM')}</p>
-                    <p className="text-lg font-bold text-primary leading-tight">{format(parseISO(h.date), 'dd')}</p>
+              {upcomingHolidays.map(h => {
+                const start = parseISO(h.date);
+                const end = h.end_date ? parseISO(h.end_date) : start;
+                const isRange = h.end_date && h.end_date !== h.date;
+                return (
+                  <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors shrink-0 w-[300px] snap-start">
+                    <div className="text-center min-w-[48px] rounded-lg bg-primary/10 p-2">
+                      <p className="text-[10px] font-semibold text-primary uppercase tracking-wide">{format(start, 'MMM')}</p>
+                      <p className="text-lg font-bold text-primary leading-tight">{format(start, 'dd')}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground text-sm truncate">{h.name}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {isRange ? `${format(start, 'dd MMM')} – ${format(end, 'dd MMM yyyy')}` : format(start, 'dd MMM yyyy')}
+                      </p>
+                      <Badge variant="outline" className="text-[10px] mt-1 font-normal">{(h as any).schools?.name}</Badge>
+                      {h.description && <p className="text-xs text-muted-foreground mt-1 truncate">{h.description}</p>}
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-foreground text-sm truncate">{h.name}</p>
-                    <Badge variant="outline" className="text-[10px] mt-1 font-normal">{(h as any).schools?.name}</Badge>
-                    {h.description && <p className="text-xs text-muted-foreground mt-1 truncate">{h.description}</p>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-8">No holidays in the next 30 days</p>
