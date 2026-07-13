@@ -19,6 +19,7 @@ import {
   Upload,
   CalendarClock,
   Users2,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -42,6 +43,7 @@ const navItems = [
 const adminNavItems = [
   { to: '/schedule', icon: CalendarClock, label: 'Instructor Schedule' },
   { to: '/instructor-attendance', icon: Users2, label: 'Instructor Attendance' },
+  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/activity-log', icon: History, label: 'Activity Log' },
   { to: '/admin', icon: ShieldCheck, label: 'Admin Management' },
   { to: '/admin-settings', icon: Settings2, label: 'Admin Settings' },

@@ -26,6 +26,7 @@ import AdminManagement from "./pages/AdminManagement";
 import AdminSettings from "./pages/AdminSettings";
 import AdminSchedule from "./pages/AdminSchedule";
 import InstructorAttendance from "./pages/InstructorAttendance";
+import Analytics from "./pages/Analytics";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
@@ -60,6 +61,7 @@ const App = () => (
             <Route path="/admin-settings" element={<ProtectedRoute adminOnly><AdminSettings /></ProtectedRoute>} />
             <Route path="/schedule" element={<ProtectedRoute adminOnly><AdminSchedule /></ProtectedRoute>} />
             <Route path="/instructor-attendance" element={<ProtectedRoute adminOnly><InstructorAttendance /></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute adminOnly><Analytics /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
