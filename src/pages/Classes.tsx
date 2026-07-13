@@ -299,6 +299,7 @@ const Classes = () => {
           'Coding AI/Applied AI (Pictoblox)',
           'Electrics and Circuits (Breadboard Kit)',
           'Electrics and Circuits (Snap Kit)',
+          'Internet of Things',
           'Lego Robotics - Ev3',
           'Lego Robotics - NxT',
            'Python Programming',
@@ -322,6 +323,7 @@ const Classes = () => {
               <SelectItem value="Coding AI/Applied AI (Pictoblox)">Coding AI/Applied AI (Pictoblox)</SelectItem>
               <SelectItem value="Electrics and Circuits (Breadboard Kit)">Electrics and Circuits (Breadboard Kit)</SelectItem>
               <SelectItem value="Electrics and Circuits (Snap Kit)">Electrics and Circuits (Snap Kit)</SelectItem>
+              <SelectItem value="Internet of Things">Internet of Things</SelectItem>
               <SelectItem value="Lego Robotics - Ev3">Lego Robotics - Ev3</SelectItem>
               <SelectItem value="Lego Robotics - NxT">Lego Robotics - NxT</SelectItem>
               <SelectItem value="Python Programming">Python Programming</SelectItem>

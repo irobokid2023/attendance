@@ -73,6 +73,7 @@ const TopicOfTheDay = () => {
     'Electrics and Circuits (Snap Kit)',
     'Lego Robotics - Ev3',
     'Lego Robotics - NxT',
+    'Internet of Things',
     'Python Programming',
     'Robotics and AI',
     'STEM Explorers',
@@ -215,7 +216,7 @@ const TopicOfTheDay = () => {
     try {
       let query = supabase
         .from('topics')
-        .select('*, classes(name, grade, div, school_id, schools(name))')
+        .select('*, classes!inner(name, grade, div, school_id, schools(name))')
         .order('date', { ascending: false });
 
       if (recDateFrom) {
@@ -223,6 +224,9 @@ const TopicOfTheDay = () => {
       }
       if (recDateTo) {
         query = query.lte('date', format(recDateTo, 'yyyy-MM-dd'));
+      }
+      if (recSchool) {
+        query = query.eq('classes.school_id', recSchool);
       }
 
       const { data, error } = await query;
@@ -324,42 +328,45 @@ const TopicOfTheDay = () => {
 
         {/* VIEW RECORDS TAB */}
         <TabsContent value="records">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 max-w-2xl">
-            <Popover open={recDateFromOpen} onOpenChange={setRecDateFromOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !recDateFrom && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {recDateFrom ? format(recDateFrom, 'dd MMM yyyy') : 'From Date'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={recDateFrom}
-                  onSelect={(d) => { setRecDateFrom(d); setRecDateFromOpen(false); }}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-
-            <Popover open={recDateToOpen} onOpenChange={setRecDateToOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !recDateTo && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {recDateTo ? format(recDateTo, 'dd MMM yyyy') : 'To Date'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={recDateTo}
-                  onSelect={(d) => { setRecDateTo(d); setRecDateToOpen(false); }}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 max-w-3xl">
+            <div>
+              <Label className="mb-1.5 block">School</Label>
+              <Select value={recSchool || '__all__'} onValueChange={v => setRecSchool(v === '__all__' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="All Schools" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Schools</SelectItem>
+                  {schools.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="mb-1.5 block">From Date</Label>
+              <Popover open={recDateFromOpen} onOpenChange={setRecDateFromOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !recDateFrom && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {recDateFrom ? format(recDateFrom, 'dd MMM yyyy') : 'From Date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={recDateFrom} onSelect={(d) => { setRecDateFrom(d); setRecDateFromOpen(false); }} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <Label className="mb-1.5 block">To Date</Label>
+              <Popover open={recDateToOpen} onOpenChange={setRecDateToOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !recDateTo && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {recDateTo ? format(recDateTo, 'dd MMM yyyy') : 'To Date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={recDateTo} onSelect={(d) => { setRecDateTo(d); setRecDateToOpen(false); }} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           <div className="flex gap-2 mb-6">

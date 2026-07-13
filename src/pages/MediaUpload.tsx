@@ -29,6 +29,7 @@ type UploadItem = {
 };
 
 const MAX_FILES = 50;
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB per file
 
 const MediaUpload = () => {
   const [schools, setSchools] = useState<any[]>([]);
@@ -66,8 +67,13 @@ const MediaUpload = () => {
       toast.warning(`You can upload a maximum of ${MAX_FILES} files at a time. Only the first ${MAX_FILES} were selected.`);
     }
     const limited = picked.slice(0, MAX_FILES);
-    setFiles(limited);
-    setItems(limited.map((f) => ({ name: f.name, status: 'pending', percent: 0 })));
+    const tooBig = limited.filter((f) => f.size > MAX_FILE_SIZE);
+    if (tooBig.length) {
+      toast.error(`${tooBig.length} file(s) exceed the 2 GB limit and were skipped.`);
+    }
+    const accepted = limited.filter((f) => f.size <= MAX_FILE_SIZE);
+    setFiles(accepted);
+    setItems(accepted.map((f) => ({ name: f.name, status: 'pending', percent: 0 })));
     setUploadComplete(false);
   };
 
@@ -79,8 +85,13 @@ const MediaUpload = () => {
     });
   };
 
-  // Use XHR so we get real per-file upload progress events.
-  const uploadOne = (file: File, school: string, className: string, idx: number) =>
+  // Small files (< 20 MB) go through the edge function directly (multipart).
+  // Larger files use a Google Drive resumable session: the edge function
+  // creates the session, then the browser PUTs bytes straight to Google — this
+  // bypasses the edge-function body size limit and supports files up to 2 GB.
+  const RESUMABLE_THRESHOLD = 20 * 1024 * 1024;
+
+  const uploadSmall = (file: File, school: string, className: string, idx: number) =>
     new Promise<void>(async (resolve) => {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token ?? '';
@@ -102,7 +113,6 @@ const MediaUpload = () => {
         const pct = Math.round((ev.loaded / ev.total) * 100);
         updateItem(idx, { status: 'uploading', percent: pct });
       };
-
       xhr.onload = () => {
         let body: any = {};
         try { body = JSON.parse(xhr.responseText); } catch {}
@@ -113,12 +123,60 @@ const MediaUpload = () => {
         }
         resolve();
       };
-      xhr.onerror = () => {
-        updateItem(idx, { status: 'error', message: 'Network error' });
-        resolve();
-      };
+      xhr.onerror = () => { updateItem(idx, { status: 'error', message: 'Network error' }); resolve(); };
       xhr.send(fd);
     });
+
+  const uploadResumable = async (file: File, school: string, className: string, idx: number) => {
+    try {
+      updateItem(idx, { status: 'uploading', percent: 0 });
+      // 1) Ask the edge function to open a resumable session with Google.
+      const { data, error } = await supabase.functions.invoke('upload-to-drive', {
+        body: {
+          mode: 'init',
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          size: file.size,
+          school,
+          className,
+        },
+      });
+      if (error) throw new Error(error.message);
+      const sessionUrl: string | undefined = (data as any)?.sessionUrl;
+      if (!sessionUrl) throw new Error('No resumable session URL returned');
+
+      // 2) PUT the whole file straight to Google with progress reporting.
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', sessionUrl);
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+        xhr.upload.onprogress = (ev) => {
+          if (!ev.lengthComputable) return;
+          const pct = Math.round((ev.loaded / ev.total) * 100);
+          updateItem(idx, { status: 'uploading', percent: pct });
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            let body: any = {};
+            try { body = JSON.parse(xhr.responseText); } catch {}
+            updateItem(idx, { status: 'done', percent: 100, link: body?.webViewLink });
+            resolve();
+          } else {
+            reject(new Error(`Upload failed (HTTP ${xhr.status})`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(file);
+      });
+    } catch (e: any) {
+      updateItem(idx, { status: 'error', message: e?.message || 'Upload failed' });
+    }
+  };
+
+  const uploadOne = (file: File, school: string, className: string, idx: number) =>
+    file.size > RESUMABLE_THRESHOLD
+      ? uploadResumable(file, school, className, idx)
+      : uploadSmall(file, school, className, idx);
 
   const handleUpload = async () => {
     if (!schoolId || !classId) return toast.error('Select a school and class');
@@ -210,7 +268,7 @@ const MediaUpload = () => {
             <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-8 cursor-pointer hover:bg-accent/50 transition-colors">
               <Upload className="w-8 h-8 text-muted-foreground" />
               <span className="text-sm font-medium">Click to choose photos or videos</span>
-              <span className="text-xs text-muted-foreground">You can select multiple files — maximum 50 at a time</span>
+              <span className="text-xs text-muted-foreground">Up to 50 files at a time · max 2 GB per file</span>
               <input
                 type="file"
                 multiple

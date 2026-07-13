@@ -126,8 +126,11 @@ const Attendance = () => {
 
   const filteredClasses = useMemo(() => {
     if (!filterSchool) return [];
-    return allClasses.filter(c => c.school_id === filterSchool);
-  }, [allClasses, filterSchool]);
+    return allClasses.filter(c =>
+      c.school_id === filterSchool &&
+      (!filterDay || filterDay === 'all' || c.day === filterDay)
+    );
+  }, [allClasses, filterSchool, filterDay]);
 
   const availableDays = useMemo(() => {
     if (!filterSchool) return [];
@@ -482,7 +485,7 @@ const Attendance = () => {
             </SelectContent>
           </Select>
 
-          <Select value={filterDay} onValueChange={setFilterDay} disabled={!filterSchool}>
+          <Select value={filterDay} onValueChange={(v) => { setFilterDay(v); setFilterClass(''); }} disabled={!filterSchool}>
             <SelectTrigger><SelectValue placeholder="All Days" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Days</SelectItem>

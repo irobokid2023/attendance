@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { LogIn, UserPlus, KeyRound } from 'lucide-react';
-import PWAInstallChecklist from '@/components/PWAInstallChecklist';
+
 
 const Auth = () => {
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
@@ -102,7 +102,7 @@ const Auth = () => {
           </CardContent>
         </Card>
 
-        <PWAInstallChecklist />
+
 
         <p className="text-center text-[11px] text-muted-foreground/60 mt-6">© {new Date().getFullYear()} iRobokid. All rights reserved.</p>
       </div>

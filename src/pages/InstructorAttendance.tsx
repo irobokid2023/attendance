@@ -36,7 +36,7 @@ const InstructorAttendance = () => {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [working, setWorking] = useState(false);
-  const [scope, setScope] = useState<'me' | 'all'>('me');
+  const [scope, setScope] = useState<'me' | 'all'>('all');
 
   const loadRecords = async () => {
     if (!user) return;
@@ -44,8 +44,15 @@ const InstructorAttendance = () => {
     let q = (supabase as any).from('instructor_attendance').select('*').order('date', { ascending: false }).limit(500);
     if (scope === 'me' || role !== 'admin') q = q.eq('instructor_id', user.id);
     const { data, error } = await q;
-    if (error) toast.error(error.message);
-    else setRecords((data as any[]) ?? []);
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    const rows = (data as any[]) ?? [];
+    const ids = Array.from(new Set(rows.map(r => r.instructor_id)));
+    let nameMap = new Map<string, string>();
+    if (ids.length) {
+      const { data: profs } = await supabase.from('profiles').select('user_id, full_name, email').in('user_id', ids);
+      (profs ?? []).forEach((p: any) => nameMap.set(p.user_id, p.full_name || p.email || '—'));
+    }
+    setRecords(rows.map(r => ({ ...r, instructor_name: nameMap.get(r.instructor_id) ?? '—' })));
     setLoading(false);
   };
 
@@ -125,8 +132,8 @@ const InstructorAttendance = () => {
   return (
     <DashboardLayout>
       <div className="page-header">
-        <h1 className="page-title flex items-center gap-2"><Users2 className="w-6 h-6" /> My Attendance</h1>
-        <p className="page-subtitle">Location is captured automatically via GPS. Expected: 8h 30m, Monday – Saturday.</p>
+        <h1 className="page-title flex items-center gap-2"><Users2 className="w-6 h-6" /> Instructor Attendance</h1>
+        <p className="page-subtitle">GPS-tracked check-in / check-out with total hours worked. Expected: 8h 30m, Mon – Sat.</p>
       </div>
 
       <Card className="mb-6">
@@ -179,10 +186,11 @@ const InstructorAttendance = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
+                      {scope === 'all' && role === 'admin' && <TableHead>Instructor</TableHead>}
                       <TableHead>Location</TableHead>
                       <TableHead>Check In</TableHead>
                       <TableHead>Check Out</TableHead>
-                      <TableHead>Hours</TableHead>
+                      <TableHead>Total Hours</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -190,6 +198,7 @@ const InstructorAttendance = () => {
                     {records.map(r => (
                       <TableRow key={r.id}>
                         <TableCell className="font-medium">{format(parseISO(r.date), 'dd MMM yyyy')}</TableCell>
+                        {scope === 'all' && role === 'admin' && <TableCell className="font-medium">{r.instructor_name}</TableCell>}
                         <TableCell className="max-w-xs truncate" title={r.location ?? ''}>{r.location ?? '—'}</TableCell>
                         <TableCell>{r.check_in_at ? format(parseISO(r.check_in_at), 'p') : '—'}</TableCell>
                         <TableCell>{r.check_out_at ? format(parseISO(r.check_out_at), 'p') : '—'}</TableCell>
