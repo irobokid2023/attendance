@@ -1,4 +1,10 @@
 // Uploads a file to Google Drive into iRobokid Media/<School>/<Class>/
+// Supports two modes:
+//   - Legacy multipart: POST multipart/form-data with 'file' (used for small files)
+//   - Resumable init:   POST JSON { mode:'init', fileName, mimeType, size, school, className }
+//     Returns { sessionUrl } — the browser then PUTs the bytes directly to sessionUrl
+//     (Google resumable session URLs need no auth; they support CORS from the browser),
+//     which bypasses the edge-function body size limit and enables uploads up to 2 GB+.
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const GATEWAY = 'https://connector-gateway.lovable.dev/google_drive';
@@ -40,10 +46,14 @@ async function ensureFolder(name: string, parentId: string): Promise<string> {
   return await createFolder(name, parentId);
 }
 
-async function pushToDrive(file: File, school: string, className: string) {
+async function ensureClassFolder(school: string, className: string): Promise<string> {
   const rootId = await ensureFolder('iRobokid Media', 'root');
   const schoolId = await ensureFolder(school, rootId);
-  const classId = await ensureFolder(className, schoolId);
+  return await ensureFolder(className, schoolId);
+}
+
+async function pushToDrive(file: File, school: string, className: string) {
+  const classId = await ensureClassFolder(school, className);
 
   const metadata = { name: file.name, parents: [classId] };
   const boundary = '-------lovable-' + crypto.randomUUID();
@@ -72,6 +82,35 @@ async function pushToDrive(file: File, school: string, className: string) {
   return await uploadRes.json();
 }
 
+async function initResumable(
+  fileName: string, mimeType: string, size: number, school: string, className: string,
+) {
+  const classId = await ensureClassFolder(school, className);
+  const metadata = { name: fileName, parents: [classId] };
+
+  const res = await fetch(
+    `${GATEWAY}/upload/drive/v3/files?uploadType=resumable&fields=id,name,webViewLink`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Upload-Content-Type': mimeType || 'application/octet-stream',
+        'X-Upload-Content-Length': String(size),
+      },
+      body: JSON.stringify(metadata),
+    },
+  );
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Drive resumable init failed (${res.status}): ${txt}`);
+  }
+  const sessionUrl = res.headers.get('location') || res.headers.get('Location');
+  if (!sessionUrl) throw new Error('Drive did not return a resumable session URL');
+  return { sessionUrl };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -82,6 +121,33 @@ Deno.serve(async (req) => {
       });
     }
 
+    const contentType = req.headers.get('content-type') || '';
+
+    // Resumable init (JSON body)
+    if (contentType.includes('application/json')) {
+      const body = await req.json();
+      if (body?.mode === 'init') {
+        const fileName = String(body.fileName ?? '').trim();
+        const mimeType = String(body.mimeType ?? 'application/octet-stream');
+        const size = Number(body.size ?? 0);
+        const school = String(body.school ?? '').trim();
+        const className = String(body.className ?? '').trim();
+        if (!fileName || !size || !school || !className) {
+          return new Response(JSON.stringify({ error: 'fileName, size, school and className are required' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const result = await initResumable(fileName, mimeType, size, school, className);
+        return new Response(JSON.stringify({ ok: true, ...result }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ error: 'Unknown mode' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Legacy multipart upload (small files)
     const form = await req.formData();
     const file = form.get('file') as File | null;
     const school = String(form.get('school') ?? '').trim();
@@ -96,7 +162,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e?.message ?? e) }), {
+    return new Response(JSON.stringify({ error: String((e as any)?.message ?? e) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
