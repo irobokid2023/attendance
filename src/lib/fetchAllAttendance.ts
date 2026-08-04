@@ -5,10 +5,14 @@ import { supabase } from '@/integrations/supabase/client';
 
 const PAGE_SIZE = 1000;
 const SAFETY_CAP = 200; // up to 200,000 rows
+const CONCURRENCY = 5; // pages fetched in parallel per batch
 
 /**
  * Generic paginated fetcher for any table. Accepts a builder that returns a
  * filtered query (without .range), and pages through all results.
+ *
+ * Pages are fetched in parallel batches which is dramatically faster than the
+ * previous sequential loop on large tables (attendance, students).
  *
  * Usage:
  *   const rows = await fetchAllPaginated(() =>
@@ -19,15 +23,25 @@ export async function fetchAllPaginated<T = any>(
   builder: () => any,
 ): Promise<T[]> {
   const all: T[] = [];
-  let from = 0;
-  for (let i = 0; i < SAFETY_CAP; i++) {
-    const { data, error } = await builder().range(from, from + PAGE_SIZE - 1);
-    if (error) break;
-    const rows = (data ?? []) as T[];
-    all.push(...rows);
-    if (rows.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
+  let pageIndex = 0;
+
+  while (pageIndex < SAFETY_CAP) {
+    const batch = Array.from({ length: CONCURRENCY }, (_, i) => pageIndex + i);
+    const results = await Promise.all(
+      batch.map((p) => builder().range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1)),
+    );
+
+    let done = false;
+    for (const { data, error } of results) {
+      if (error) { done = true; break; }
+      const rows = (data ?? []) as T[];
+      all.push(...rows);
+      if (rows.length < PAGE_SIZE) { done = true; break; }
+    }
+    if (done) break;
+    pageIndex += CONCURRENCY;
   }
+
   return all;
 }
 

@@ -13,5 +13,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    flowType: 'pkce',
+    // Recovery links are parsed manually on /reset-password so the client never
+    // consumes the token before the reset form can use it.
+    detectSessionInUrl: false,
   }
 });
