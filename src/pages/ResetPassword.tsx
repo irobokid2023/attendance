@@ -46,43 +46,48 @@ const ResetPassword = () => {
           return;
         }
 
-        // 1) PKCE flow: ?code=...
-        const code = url.searchParams.get('code');
-        if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            setErrorMsg(error.message);
-            setChecking(false);
-            return;
-          }
-          // Clean URL
+        const finish = () => {
           window.history.replaceState({}, '', '/reset-password');
           setReady(true);
           setChecking(false);
-          return;
-        }
+        };
 
-        // 2) Implicit flow: #access_token=...&type=recovery
+        // 1) Implicit flow: #access_token=...&type=recovery
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
-        const type = hashParams.get('type');
-        if (accessToken && refreshToken && (type === 'recovery' || !type)) {
+        if (accessToken && refreshToken) {
           const { error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
-          if (error) {
-            setErrorMsg(error.message);
-            setChecking(false);
-            return;
-          }
-          window.history.replaceState({}, '', '/reset-password');
-          setReady(true);
+          if (error) { setErrorMsg(error.message); setChecking(false); return; }
+          finish();
+          return;
+        }
+
+        // 2) PKCE flow: ?code=...
+        const code = url.searchParams.get('code');
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error) { finish(); return; }
+          // The code may already have been consumed — fall back to the session.
+          const { data } = await supabase.auth.getSession();
+          if (data.session) { finish(); return; }
+          setErrorMsg(error.message);
           setChecking(false);
           return;
         }
 
-        // 3) Fallback — already-active session (e.g. PASSWORD_RECOVERY fired before init ran)
+        // 3) Token-hash flow: ?token_hash=...&type=recovery
+        const tokenHash = url.searchParams.get('token_hash') || hashParams.get('token_hash');
+        if (tokenHash) {
+          const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+          if (error) { setErrorMsg(error.message); setChecking(false); return; }
+          finish();
+          return;
+        }
+
+        // 4) Fallback — already-active session
         const { data } = await supabase.auth.getSession();
         if (data.session) setReady(true);
         setChecking(false);
@@ -91,6 +96,7 @@ const ResetPassword = () => {
         setChecking(false);
       }
     };
+
 
     init();
 

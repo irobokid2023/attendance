@@ -74,7 +74,15 @@ const AdminSchedule = () => {
     });
 
     setRows(merged);
-    setInstructors((profilesRes.data ?? []).filter((p: any) => (p.full_name || '').trim()));
+    // Show every signed-up user as a draggable block (fall back to the email
+    // handle when a profile has no full name yet).
+    setInstructors(
+      (profilesRes.data ?? []).map((p: any) => ({
+        ...p,
+        display_name: (p.full_name || '').trim() || (p.email || '').split('@')[0] || 'Unnamed user',
+      })),
+    );
+
     setLoading(false);
   };
 
@@ -268,16 +276,17 @@ const AdminSchedule = () => {
               <p className="text-[11px] text-muted-foreground mb-3">Drag onto a class row to assign.</p>
               <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
                 {instructors.length === 0 && <p className="text-xs text-muted-foreground">No users found.</p>}
+                <p className="text-[10px] text-muted-foreground">{instructors.length} user(s)</p>
                 {instructors.map(u => (
                   <div
                     key={u.id}
                     draggable
-                    onDragStart={(e) => e.dataTransfer.setData('text/plain', u.full_name)}
+                    onDragStart={(e) => e.dataTransfer.setData('text/plain', u.display_name)}
                     className="flex items-center gap-2 px-2 py-2 rounded-md border bg-card hover:bg-accent cursor-grab active:cursor-grabbing text-xs"
                     title={u.email}
                   >
                     <GripVertical className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span className="truncate">{u.full_name}</span>
+                    <span className="truncate">{u.display_name}</span>
                   </div>
                 ))}
               </div>

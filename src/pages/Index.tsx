@@ -11,9 +11,13 @@ const Index = () => {
     // forward the token to the reset page before any session redirect.
     const hash = window.location.hash || '';
     const search = window.location.search || '';
+    const params = new URLSearchParams(search);
     const isRecovery =
       hash.includes('type=recovery') ||
-      new URLSearchParams(search).has('code');
+      hash.includes('access_token=') ||
+      params.has('code') ||
+      params.has('token_hash') ||
+      params.get('type') === 'recovery';
     if (isRecovery) {
       navigate(`/reset-password${search}${hash}`, { replace: true });
       return;
@@ -22,6 +26,7 @@ const Index = () => {
       navigate(user ? '/dashboard' : '/auth', { replace: true });
     }
   }, [user, loading, navigate]);
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">

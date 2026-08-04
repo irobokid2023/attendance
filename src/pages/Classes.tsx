@@ -132,14 +132,19 @@ const Classes = () => {
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
 
   const fetchData = async () => {
-    const [classesData, schoolsData, attendanceRows, allStudents] = await Promise.all([
+    // 1) Paint the class + school lists first.
+    const [classesData, schoolsData] = await Promise.all([
       fetchAllPaginated<any>(() => supabase.from('classes').select('*, schools(name)').order('created_at', { ascending: false })),
       fetchAllPaginated<{ id: string; name: string }>(() => supabase.from('schools').select('id, name').order('name', { ascending: true })),
-      fetchAllAttendanceSessions(),
-      fetchAllPaginated<{ id: string; class_id: string }>(() => supabase.from('students').select('id, class_id')),
     ]);
     setClasses(classesData);
     setSchools(schoolsData);
+
+    // 2) Hydrate heavy counts afterwards.
+    const [attendanceRows, allStudents] = await Promise.all([
+      fetchAllAttendanceSessions(),
+      fetchAllPaginated<{ id: string; class_id: string }>(() => supabase.from('students').select('id, class_id')),
+    ]);
     const counts: Record<string, Set<string>> = {};
     attendanceRows.forEach((r: any) => { if (!counts[r.class_id]) counts[r.class_id] = new Set(); counts[r.class_id].add(`${r.date}|${r.topic || ''}`); });
     const result: Record<string, number> = {};
@@ -149,6 +154,7 @@ const Classes = () => {
     allStudents.forEach((s) => { sCounts[s.class_id] = (sCounts[s.class_id] || 0) + 1; });
     setStudentCounts(sCounts);
   };
+
 
   useEffect(() => { fetchData(); }, []);
 

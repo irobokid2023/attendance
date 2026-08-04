@@ -67,14 +67,22 @@ const Schools = () => {
   const [schoolStats, setSchoolStats] = useState<Record<string, { classes: number; students: number; sessionsConducted: number; totalSessions: number }>>({});
 
   const fetchSchools = async () => {
-    // List view only needs school info + per-school class/student counts.
-    // Attendance is heavy (10k+ rows) — fetch it lazily inside fetchClasses().
-    const [schoolsData, classesData, studentsData] = await Promise.all([
-      fetchAllPaginated<any>(() => supabase.from('schools').select('*').order('created_at', { ascending: false })),
+    // 1) Render the school list immediately.
+    const schoolsData = await fetchAllPaginated<any>(() =>
+      supabase.from('schools').select('*').order('created_at', { ascending: false }),
+    );
+    setSchools(schoolsData);
+    setSchoolStats((prev) => {
+      const base = { ...prev };
+      schoolsData.forEach((s) => { if (!base[s.id]) base[s.id] = { classes: 0, students: 0, sessionsConducted: 0, totalSessions: 0 }; });
+      return base;
+    });
+
+    // 2) Hydrate counts in the background (never blocks first paint).
+    const [classesData, studentsData] = await Promise.all([
       fetchAllPaginated<{ id: string; school_id: string; num_sessions: number | null }>(() => supabase.from('classes').select('id, school_id, num_sessions')),
       fetchAllPaginated<{ id: string; class_id: string }>(() => supabase.from('students').select('id, class_id')),
     ]);
-    setSchools(schoolsData);
 
     const classSchoolMap: Record<string, string> = {};
     classesData.forEach((c) => { classSchoolMap[c.id] = c.school_id; });
@@ -88,7 +96,11 @@ const Schools = () => {
       }
     });
     studentsData.forEach((s) => { const schoolId = classSchoolMap[s.class_id]; if (schoolId && stats[schoolId]) stats[schoolId].students++; });
-    setSchoolStats(stats);
+    setSchoolStats((prev) => {
+      const merged = { ...prev };
+      Object.entries(stats).forEach(([id, v]) => { merged[id] = { ...v, sessionsConducted: prev[id]?.sessionsConducted ?? 0 }; });
+      return merged;
+    });
   };
 
   useEffect(() => { fetchSchools(); }, []);
@@ -97,13 +109,23 @@ const Schools = () => {
 
   const fetchClasses = useCallback(async (schoolId: string) => {
     setClassesLoading(true);
-    const [classesData, attendanceRows, studentsData] = await Promise.all([
-      fetchAllPaginated<any>(() => supabase.from('classes').select('*').eq('school_id', schoolId).order('name', { ascending: true })),
-      fetchAllAttendanceSessions(),
-      fetchAllPaginated<{ id: string; class_id: string }>(() => supabase.from('students').select('id, class_id')),
-    ]);
+    const classesData = await fetchAllPaginated<any>(() =>
+      supabase.from('classes').select('*').eq('school_id', schoolId).order('name', { ascending: true }),
+    );
     setClasses(classesData);
-    
+    setClassesLoading(false);
+
+    const classIds = classesData.map((c: any) => c.id);
+    if (classIds.length === 0) { setClassSessionsConducted({}); setClassStudentCounts({}); return; }
+
+    // Scope heavy queries to this school's classes only.
+    const [attendanceRows, studentsData] = await Promise.all([
+      fetchAllPaginated<{ class_id: string; date: string; topic: string | null }>(() =>
+        supabase.from('attendance').select('class_id, date, topic').in('class_id', classIds)),
+      fetchAllPaginated<{ id: string; class_id: string }>(() =>
+        supabase.from('students').select('id, class_id').in('class_id', classIds)),
+    ]);
+
     const conducted: Record<string, Set<string>> = {};
     attendanceRows.forEach((a: any) => {
       if (!conducted[a.class_id]) conducted[a.class_id] = new Set();
@@ -112,11 +134,18 @@ const Schools = () => {
     const conductedCounts: Record<string, number> = {};
     Object.entries(conducted).forEach(([id, sessions]) => { conductedCounts[id] = sessions.size; });
     setClassSessionsConducted(conductedCounts);
+    setSchoolStats((prev) => ({
+      ...prev,
+      [schoolId]: {
+        ...(prev[schoolId] ?? { classes: classesData.length, students: 0, totalSessions: 0, sessionsConducted: 0 }),
+        sessionsConducted: Object.values(conductedCounts).reduce((a, b) => a + b, 0),
+      },
+    }));
     const sCounts: Record<string, number> = {};
     studentsData.forEach((s) => { sCounts[s.class_id] = (sCounts[s.class_id] || 0) + 1; });
     setClassStudentCounts(sCounts);
-    setClassesLoading(false);
   }, []);
+
 
   const handleSelectSchool = (schoolId: string) => {
     setSelectedSchoolId(schoolId);
@@ -361,7 +390,7 @@ const Schools = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="page-title flex items-center gap-2"><School className="w-5 h-5 text-primary" />{selectedSchool.name}</h1>
+            <h1 className="page-title">{selectedSchool.name}</h1>
             <p className="page-subtitle">{selectedSchool.address ?? 'No address'}</p>
           </div>
         </div>
@@ -484,7 +513,7 @@ const Schools = () => {
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(school)}><Pencil className="w-3.5 h-3.5" /></Button>
                     <Checkbox checked={selected.has(school.id)} onCheckedChange={() => toggleSelect(school.id)} />
                   </div>
-                  <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><School className="w-4 h-4 text-primary" />{school.name}</CardTitle></CardHeader>
+                  <CardHeader className="pb-3"><CardTitle className="text-base">{school.name}</CardTitle></CardHeader>
                    <CardContent>
                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
                        <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{schoolStats[school.id]?.classes ?? 0} classes</span>
@@ -512,7 +541,7 @@ const Schools = () => {
                   {filtered.map((school) => (
                     <TableRow key={school.id} className="cursor-pointer" onClick={() => handleSelectSchool(school.id)}>
                       <TableCell onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(school.id)} onCheckedChange={() => toggleSelect(school.id)} /></TableCell>
-                      <TableCell className="font-medium"><div className="flex items-center gap-2"><School className="w-4 h-4 text-primary" />{school.name}</div></TableCell>
+                      <TableCell className="font-medium">{school.name}</TableCell>
                        <TableCell className="text-muted-foreground">{schoolStats[school.id]?.classes ?? 0}</TableCell>
                        <TableCell className="text-muted-foreground">{schoolStats[school.id]?.students ?? 0}</TableCell>
                        <TableCell className="text-muted-foreground">{(school.days ?? []).length > 0 ? (school.days as string[]).map((d: string) => d.slice(0, 3)).join(', ') : '—'}</TableCell>
