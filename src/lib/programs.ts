@@ -1,7 +1,7 @@
 // Canonical list of program names used across Classes, Topic of the Day and curriculum import.
 export const PROGRAM_OPTIONS = [
   '3D - Designing and Printing (123D) + Drone',
-  '3D - Designing and Printing (tinkercard) + Drone',
+  '3D - Designing and Printing (TinkerCad) + Drone',
   'Advance Python Programming',
   'App Inventor (MIT)',
   'Arduino Electronics and Programming',

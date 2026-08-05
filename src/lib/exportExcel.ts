@@ -20,8 +20,7 @@ const headerStyle = {
   border: thinBorder,
 };
 
-export function exportToExcel({ filename, sheetName = 'Sheet1', rows }: ExportExcelOptions) {
-  if (rows.length === 0) return;
+function buildSheet(rows: Record<string, any>[]) {
   const headers = Object.keys(rows[0]);
   const data = [headers, ...rows.map(r => headers.map(h => r[h] ?? ''))];
   const ws = XLSX.utils.aoa_to_sheet(data);
@@ -42,8 +41,30 @@ export function exportToExcel({ filename, sheetName = 'Sheet1', rows }: ExportEx
   }
 
   ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 15) }));
+  return ws;
+}
 
+export function exportToExcel({ filename, sheetName = 'Sheet1', rows }: ExportExcelOptions) {
+  if (rows.length === 0) return;
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.utils.book_append_sheet(wb, buildSheet(rows), sheetName);
+  XLSX.writeFile(wb, filename);
+}
+
+export function exportToExcelMultiSheet({
+  filename,
+  sheets,
+}: {
+  filename: string;
+  sheets: { name: string; rows: Record<string, any>[] }[];
+}) {
+  const wb = XLSX.utils.book_new();
+  let added = 0;
+  sheets.forEach(s => {
+    if (!s.rows.length) return;
+    XLSX.utils.book_append_sheet(wb, buildSheet(s.rows), s.name.slice(0, 31));
+    added++;
+  });
+  if (!added) return;
   XLSX.writeFile(wb, filename);
 }
