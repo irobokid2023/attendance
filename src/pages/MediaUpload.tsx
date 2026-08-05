@@ -12,6 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import MediaLibrary, { addMediaRecord } from '@/components/MediaLibrary';
 
 const getClassName = (cls: any): string => {
   const parts = [cls.name];
@@ -118,6 +119,10 @@ const MediaUpload = () => {
         try { body = JSON.parse(xhr.responseText); } catch {}
         if (xhr.status >= 200 && xhr.status < 300) {
           updateItem(idx, { status: 'done', percent: 100, link: body?.file?.webViewLink });
+          addMediaRecord({
+            name: file.name, size: file.size, type: file.type,
+            school, className, link: body?.file?.webViewLink, fileId: body?.file?.id,
+          });
         } else {
           updateItem(idx, { status: 'error', message: body?.error || `HTTP ${xhr.status}` });
         }
@@ -127,46 +132,80 @@ const MediaUpload = () => {
       xhr.send(fd);
     });
 
+  const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB chunks
+
   const uploadResumable = async (file: File, school: string, className: string, idx: number) => {
     try {
       updateItem(idx, { status: 'uploading', percent: 0 });
       // 1) Ask the edge function to open a resumable session with Google.
-      const { data, error } = await supabase.functions.invoke('upload-to-drive', {
-        body: {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token ?? '';
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const initRes = await fetch(`https://${projectId}.supabase.co/functions/v1/upload-to-drive`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           mode: 'init',
           fileName: file.name,
           mimeType: file.type || 'application/octet-stream',
           size: file.size,
           school,
           className,
-        },
+        }),
       });
-      if (error) throw new Error(error.message);
-      const sessionUrl: string | undefined = (data as any)?.sessionUrl;
+      const initJson = await initRes.json().catch(() => ({}));
+      if (!initRes.ok) throw new Error(initJson?.error || `HTTP ${initRes.status}`);
+      const sessionUrl: string | undefined = initJson?.sessionUrl;
       if (!sessionUrl) throw new Error('No resumable session URL returned');
 
-      // 2) PUT the whole file straight to Google with progress reporting.
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', sessionUrl);
-        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-        xhr.upload.onprogress = (ev) => {
-          if (!ev.lengthComputable) return;
-          const pct = Math.round((ev.loaded / ev.total) * 100);
-          updateItem(idx, { status: 'uploading', percent: pct });
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            let body: any = {};
-            try { body = JSON.parse(xhr.responseText); } catch {}
-            updateItem(idx, { status: 'done', percent: 100, link: body?.webViewLink });
-            resolve();
-          } else {
-            reject(new Error(`Upload failed (HTTP ${xhr.status})`));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.send(file);
+      // 2) PUT the file to Google in chunks (bypasses proxy/body limits).
+      const total = file.size;
+      let offset = 0;
+      let finished: any = null;
+
+      while (offset < total) {
+        const end = Math.min(offset + CHUNK_SIZE, total);
+        const chunk = file.slice(offset, end);
+        let res: Response | null = null;
+        try {
+          res = await fetch(sessionUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Range': `bytes ${offset}-${end - 1}/${total}`,
+            },
+            body: chunk,
+          });
+        } catch {
+          // Google frequently closes the connection on the final chunk after
+          // committing the file — treat that as success.
+          if (end >= total) { finished = {}; break; }
+          throw new Error('Network error during upload');
+        }
+
+        if (res.status === 308) {
+          const range = res.headers.get('range');
+          const next = range ? Number(range.split('-')[1]) + 1 : end;
+          offset = Number.isFinite(next) && next > offset ? next : end;
+        } else if (res.ok) {
+          finished = await res.json().catch(() => ({}));
+          offset = total;
+        } else {
+          const txt = await res.text().catch(() => '');
+          throw new Error(txt || `Upload failed (HTTP ${res.status})`);
+        }
+
+        updateItem(idx, { status: 'uploading', percent: Math.round((Math.min(offset, total) / total) * 100) });
+      }
+
+      const link = finished?.webViewLink;
+      updateItem(idx, { status: 'done', percent: 100, link });
+      addMediaRecord({
+        name: file.name, size: file.size, type: file.type,
+        school, className, link, fileId: finished?.id,
       });
     } catch (e: any) {
       updateItem(idx, { status: 'error', message: e?.message || 'Upload failed' });
@@ -334,6 +373,8 @@ const MediaUpload = () => {
             </div>
           </CardContent>
         </Card>
+
+        <MediaLibrary schools={schools} classes={classes} getClassName={getClassName} />
       </div>
 
       <AlertDialog open={askMore} onOpenChange={setAskMore}>

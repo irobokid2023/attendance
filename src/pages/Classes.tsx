@@ -21,6 +21,7 @@ import { exportToExcel } from '@/lib/exportExcel';
 import { exportToPdf } from '@/lib/exportPdf';
 import ExportDropdown from '@/components/ExportDropdown';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { PROGRAM_OPTIONS } from '@/lib/programs';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const ROMAN_GRADES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
@@ -296,23 +297,7 @@ const Classes = () => {
     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
       <div className="space-y-2">
         <Label>Program Name *</Label>
-        {form.name === '__custom__' || (form.name && ![
-          'Advance Python Programming',
-          'App Inventor (MIT)',
-          'Arduino Electronics and Programming',
-          'Arduino Robotics',
-          'Coding (Scratch)',
-          'Coding AI/Applied AI (Pictoblox)',
-          'Electrics and Circuits (Breadboard Kit)',
-          'Electrics and Circuits (Snap Kit)',
-          'Internet of Things',
-          'Lego Robotics - Ev3',
-          'Lego Robotics - NxT',
-           'Python Programming',
-           'Robotics and AI',
-           'STEM Explorers',
-           'Young Engineers',
-        ].includes(form.name)) && form.name !== '' ? (
+        {form.name === '__custom__' || (form.name && !(PROGRAM_OPTIONS as readonly string[]).includes(form.name) && form.name !== '') ? (
           <div className="flex gap-2">
             <Input value={form.name === '__custom__' ? '' : form.name} onChange={(e) => setField('name', e.target.value)} placeholder="Enter custom program name" required />
             <Button type="button" variant="outline" size="sm" onClick={() => setField('name', '')}>List</Button>
@@ -321,21 +306,9 @@ const Classes = () => {
           <Select value={form.name} onValueChange={(v) => { if (v === '__custom__') setField('name', '__custom__'); else setField('name', v); }}>
             <SelectTrigger><SelectValue placeholder="Select program" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="Advance Python Programming">Advance Python Programming</SelectItem>
-              <SelectItem value="App Inventor (MIT)">App Inventor (MIT)</SelectItem>
-              <SelectItem value="Arduino Electronics and Programming">Arduino Electronics and Programming</SelectItem>
-              <SelectItem value="Arduino Robotics">Arduino Robotics</SelectItem>
-              <SelectItem value="Coding (Scratch)">Coding (Scratch)</SelectItem>
-              <SelectItem value="Coding AI/Applied AI (Pictoblox)">Coding AI/Applied AI (Pictoblox)</SelectItem>
-              <SelectItem value="Electrics and Circuits (Breadboard Kit)">Electrics and Circuits (Breadboard Kit)</SelectItem>
-              <SelectItem value="Electrics and Circuits (Snap Kit)">Electrics and Circuits (Snap Kit)</SelectItem>
-              <SelectItem value="Internet of Things">Internet of Things</SelectItem>
-              <SelectItem value="Lego Robotics - Ev3">Lego Robotics - Ev3</SelectItem>
-              <SelectItem value="Lego Robotics - NxT">Lego Robotics - NxT</SelectItem>
-              <SelectItem value="Python Programming">Python Programming</SelectItem>
-              <SelectItem value="Robotics and AI">Robotics and AI</SelectItem>
-              <SelectItem value="STEM Explorers">STEM Explorers</SelectItem>
-              <SelectItem value="Young Engineers">Young Engineers</SelectItem>
+              {PROGRAM_OPTIONS.map((p) => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
+              ))}
               <SelectItem value="__custom__">Custom</SelectItem>
             </SelectContent>
           </Select>
