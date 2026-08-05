@@ -142,6 +142,63 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      if (body?.mode === 'delete') {
+        const fileId = String(body.fileId ?? '').trim();
+        if (!fileId) {
+          return new Response(JSON.stringify({ error: 'fileId is required' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const res = await fetch(`${GATEWAY}/drive/v3/files/${fileId}`, {
+          method: 'DELETE', headers: authHeaders(),
+        });
+        if (!res.ok && res.status !== 404) {
+          const txt = await res.text();
+          return new Response(JSON.stringify({ error: `Drive delete failed (${res.status}): ${txt}` }), {
+            status: res.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (body?.mode === 'move') {
+        const fileId = String(body.fileId ?? '').trim();
+        const school = String(body.school ?? '').trim();
+        const className = String(body.className ?? '').trim();
+        if (!fileId || !school || !className) {
+          return new Response(JSON.stringify({ error: 'fileId, school and className are required' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const targetId = await ensureClassFolder(school, className);
+        const metaRes = await fetch(`${GATEWAY}/drive/v3/files/${fileId}?fields=parents`, { headers: authHeaders() });
+        if (!metaRes.ok) {
+          const txt = await metaRes.text();
+          return new Response(JSON.stringify({ error: `Drive lookup failed (${metaRes.status}): ${txt}` }), {
+            status: metaRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const parents: string[] = (await metaRes.json()).parents ?? [];
+        const qs = new URLSearchParams({ addParents: targetId, fields: 'id,parents' });
+        if (parents.length) qs.set('removeParents', parents.join(','));
+        const patchRes = await fetch(`${GATEWAY}/drive/v3/files/${fileId}?${qs.toString()}`, {
+          method: 'PATCH',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        if (!patchRes.ok) {
+          const txt = await patchRes.text();
+          return new Response(JSON.stringify({ error: `Drive move failed (${patchRes.status}): ${txt}` }), {
+            status: patchRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       return new Response(JSON.stringify({ error: 'Unknown mode' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
