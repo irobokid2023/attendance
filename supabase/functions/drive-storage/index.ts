@@ -1,5 +1,10 @@
 // Returns total bytes used by files under "iRobokid Media" folder in Google Drive
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const GATEWAY = 'https://connector-gateway.lovable.dev/google_drive';
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY') ?? '';
@@ -39,9 +44,30 @@ async function listChildren(parentId: string): Promise<{ id: string; mimeType: s
   return out;
 }
 
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const ANON_KEY = Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+
+const unauthorized = (msg = 'Unauthorized', status = 401) =>
+  new Response(JSON.stringify({ error: msg }), {
+    status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
+    // Require an authenticated admin caller
+    const authHeader = req.headers.get('Authorization') ?? '';
+    if (!authHeader) return unauthorized('Missing authorization');
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData.user) return unauthorized();
+    const { data: isAdmin } = await userClient.rpc('has_role', {
+      _user_id: userData.user.id, _role: 'admin',
+    });
+    if (!isAdmin) return unauthorized('Forbidden: admin role required', 403);
+
     if (!LOVABLE_API_KEY || !GOOGLE_DRIVE_API_KEY) {
       return new Response(JSON.stringify({ error: 'Drive connection not configured' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

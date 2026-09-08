@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { isAttended } from '@/lib/attendanceUtils';
 import { logActivity } from '@/lib/activityLogger';
 import DashboardLayout from '@/components/DashboardLayout';
+import TopicSuggestInput from '@/components/TopicSuggestInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -565,7 +566,14 @@ const Attendance = () => {
 
                 <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                   <label className="text-sm font-medium text-foreground">Topic of the Day *</label>
-                  <Input placeholder="Enter the topic covered today..." value={topic} onChange={e => setTopic(e.target.value)} className="max-w-md" required />
+                  <TopicSuggestInput
+                    value={topic}
+                    onChange={setTopic}
+                    program={allClasses.find(c => c.id === filterClass)?.name}
+                    placeholder="Enter the topic covered today..."
+                    className="max-w-md"
+                    required
+                  />
                 </div>
 
                 <ExportDropdown onExportExcel={handleExportExcel} onExportPdf={handleExportPdf} />

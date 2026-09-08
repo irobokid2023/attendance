@@ -276,20 +276,49 @@ const Classes = () => {
     }
   };
 
-  const handleExport = () => {
-    exportToExcel({ filename: 'classes.xlsx', sheetName: 'Classes', rows: filtered.map((c) => ({
-       'Class Name': getClassName(c), 'Program Name': c.name, School: c.schools?.name ?? '', Grade: c.grade ?? '', Division: c.div ?? '', Day: c.day ?? '', Timing: c.timing ?? '',
-       'No. of Students': studentCounts[c.id] || 0, 'No. of Sessions': c.num_sessions ?? 0, 'Sessions Conducted': sessionCounts[c.id] || 0,
-       Instructors: c.instructor_names ?? '', Venue: c.venue ?? '',
-     })) });
+  const handleExport = async () => {
+    // Make sure counts are available even if background hydration hasn't finished.
+    let sCounts = studentCounts;
+    let secCounts = sessionCounts;
+    if (Object.keys(sCounts).length === 0 || Object.keys(secCounts).length === 0) {
+      const [attendanceRows, allStudents] = await Promise.all([
+        fetchAllAttendanceSessions(),
+        fetchAllPaginated<{ id: string; class_id: string }>(() => supabase.from('students').select('id, class_id')),
+      ]);
+      const sets: Record<string, Set<string>> = {};
+      attendanceRows.forEach((r: any) => { if (!sets[r.class_id]) sets[r.class_id] = new Set(); sets[r.class_id].add(`${r.date}|${r.topic || ''}`); });
+      secCounts = {};
+      Object.entries(sets).forEach(([id, s]) => { secCounts[id] = s.size; });
+      sCounts = {};
+      allStudents.forEach((s) => { sCounts[s.class_id] = (sCounts[s.class_id] || 0) + 1; });
+      setSessionCounts(secCounts);
+      setStudentCounts(sCounts);
+    }
+
+    const rows = filtered.map((c) => ({
+      'Class Name': getClassName(c), 'Program Name': c.name, School: c.schools?.name ?? '', Grade: c.grade ?? '', Division: c.div ?? '', Day: c.day ?? '', Timing: c.timing ?? '',
+      'No. of Students': sCounts[c.id] || 0, 'No. of Sessions': c.num_sessions ?? 0, 'Sessions Conducted': secCounts[c.id] || 0,
+      Instructors: c.instructor_names ?? '', Venue: c.venue ?? '',
+    }));
+    rows.push({
+      'Class Name': 'Total', 'Program Name': `${filtered.length} classes`, School: '', Grade: '', Division: '', Day: '', Timing: '',
+      'No. of Students': rows.reduce((a, r) => a + (r['No. of Students'] as number), 0),
+      'No. of Sessions': rows.reduce((a, r) => a + (r['No. of Sessions'] as number), 0),
+      'Sessions Conducted': rows.reduce((a, r) => a + (r['Sessions Conducted'] as number), 0),
+      Instructors: '', Venue: '',
+    } as any);
+    exportToExcel({ filename: 'classes.xlsx', sheetName: 'Classes', rows });
   };
 
   const handleExportPdf = () => {
-    const headers = ['Class Name', 'School', 'Grade', 'Div', 'Day', 'Timing', 'Sessions', 'Instructors'];
+    const headers = ['Class Name', 'School', 'Grade', 'Div', 'Day', 'Timing', 'Students', 'Sessions', 'Instructors'];
     const rows = filtered.map(c => [
       getClassName(c), c.schools?.name ?? '', c.grade ?? '—', c.div ?? '—', c.day ?? '—', c.timing ?? '—',
+      String(studentCounts[c.id] || 0),
       `${sessionCounts[c.id] || 0}/${c.num_sessions ?? 0}`, c.instructor_names ?? '—',
     ]);
+    const totalStudents = filtered.reduce((a, c) => a + (studentCounts[c.id] || 0), 0);
+    rows.push(['Total', `${filtered.length} classes`, '', '', '', '', String(totalStudents), '', '']);
     exportToPdf({ title: 'Classes Report', headers, rows, filename: 'classes.pdf' });
   };
 

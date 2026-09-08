@@ -7,12 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, CheckCircle2, XCircle, FileImage, FileVideo, ExternalLink } from 'lucide-react';
+import { Upload, CheckCircle2, XCircle, FileImage, FileVideo, ExternalLink, Copy } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import MediaLibrary, { addMediaRecord } from '@/components/MediaLibrary';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/hooks/useAuth';
+import { fileMd5, findDuplicate, type ExistingFile } from '@/lib/mediaHash';
+import { cn } from '@/lib/utils';
+
+
 
 const getClassName = (cls: any): string => {
   const parts = [cls.name];
@@ -23,16 +29,40 @@ const getClassName = (cls: any): string => {
 
 type UploadItem = {
   name: string;
-  status: 'pending' | 'uploading' | 'done' | 'error';
+  status: 'pending' | 'uploading' | 'done' | 'error' | 'skipped';
   percent: number;
   message?: string;
   link?: string;
+  duplicate?: 'exact' | 'likely';
 };
 
 const MAX_FILES = 50;
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB per file
 
+const callFn = async (fn: string, payload: Record<string, unknown>) => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token ?? '';
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  const res = await fetch(`https://${projectId}.supabase.co/functions/v1/${fn}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+  try { return JSON.parse(text); } catch { return {}; }
+};
+
+
 const MediaUpload = () => {
+  const { user } = useAuth();
+  const uploaderLabel = () =>
+    (user?.user_metadata?.full_name as string) || user?.email || 'Unknown user';
+  const [tab, setTab] = useState<'upload' | 'records'>('upload');
   const [schools, setSchools] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [schoolId, setSchoolId] = useState('');
@@ -42,6 +72,8 @@ const MediaUpload = () => {
   const [uploading, setUploading] = useState(false);
   const [askMore, setAskMore] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
+  const [checkingDupes, setCheckingDupes] = useState(false);
+  const [skipDuplicates, setSkipDuplicates] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -61,6 +93,8 @@ const MediaUpload = () => {
 
   const selectedSchool = schools.find((s) => s.id === schoolId);
   const selectedClass = classes.find((c) => c.id === classId);
+  const destinationReady = Boolean(selectedSchool && selectedClass);
+
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? []);
@@ -77,6 +111,47 @@ const MediaUpload = () => {
     setItems(accepted.map((f) => ({ name: f.name, status: 'pending', percent: 0 })));
     setUploadComplete(false);
   };
+
+  // Duplicate detection: compare each picked file against what is already in the
+  // destination Drive folder (exact MD5 match, or same name + size).
+  useEffect(() => {
+    if (files.length === 0 || !selectedSchool || !selectedClass) return;
+    let cancelled = false;
+    (async () => {
+      setCheckingDupes(true);
+      try {
+        const res = await callFn('media-list', {
+          school: selectedSchool.name,
+          className: getClassName(selectedClass),
+        });
+        const existing: ExistingFile[] = ((res?.files ?? []) as any[]).map((f) => ({
+          name: f.name, size: Number(f.size ?? 0), md5: f.md5 ?? '',
+        }));
+        let found = 0;
+        for (let i = 0; i < files.length; i++) {
+          if (cancelled) return;
+          const md5 = await fileMd5(files[i]).catch(() => null);
+          const dup = findDuplicate(files[i], md5, existing);
+          if (dup) {
+            found++;
+            updateItem(i, { duplicate: dup.exact ? 'exact' : 'likely' });
+          } else {
+            updateItem(i, { duplicate: undefined });
+          }
+        }
+        if (!cancelled && found > 0) {
+          toast.warning(`${found} of the selected file(s) look already uploaded to this class.`);
+        }
+      } catch {
+        /* duplicate check is best-effort */
+      } finally {
+        if (!cancelled) setCheckingDupes(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files, schoolId, classId]);
+
 
   const updateItem = (idx: number, patch: Partial<UploadItem>) => {
     setItems((prev) => {
@@ -103,6 +178,7 @@ const MediaUpload = () => {
       fd.append('file', file);
       fd.append('school', school);
       fd.append('className', className);
+      fd.append('uploadedBy', uploaderLabel());
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url);
@@ -155,6 +231,7 @@ const MediaUpload = () => {
           size: file.size,
           school,
           className,
+          uploadedBy: uploaderLabel(),
         }),
       });
       const initJson = await initRes.json().catch(() => ({}));
@@ -225,19 +302,29 @@ const MediaUpload = () => {
     setUploading(true);
     const schoolName = selectedSchool.name;
     const className = getClassName(selectedClass);
+    const dupeFlags = items.map((it) => it.duplicate);
+    let skipped = 0;
 
     for (let i = 0; i < files.length; i++) {
+      if (skipDuplicates && dupeFlags[i]) {
+        skipped++;
+        updateItem(i, { status: 'skipped', percent: 100, message: 'Already in Drive — skipped' });
+        continue;
+      }
       await uploadOne(files[i], schoolName, className, i);
     }
 
     setUploading(false);
     setItems((curr) => {
       const ok = curr.filter((n) => n.status === 'done').length;
-      const fail = curr.length - ok;
+      const fail = curr.filter((n) => n.status === 'error').length;
       if (fail === 0) {
-        toast.success(`Uploaded ${ok} file${ok === 1 ? '' : 's'} to Google Drive`);
+        toast.success(
+          `Uploaded ${ok} file${ok === 1 ? '' : 's'} to Google Drive` +
+          (skipped ? ` · ${skipped} duplicate${skipped === 1 ? '' : 's'} skipped` : ''),
+        );
       } else {
-        toast.warning(`Done: ${ok}, failed: ${fail}`);
+        toast.warning(`Done: ${ok}, failed: ${fail}${skipped ? `, skipped: ${skipped}` : ''}`);
       }
       if (ok > 0) {
         setAskMore(true);
@@ -266,6 +353,12 @@ const MediaUpload = () => {
           <p className="page-subtitle">Photos and videos are uploaded directly to Google Drive — nothing is stored in the app.</p>
         </div>
 
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'upload' | 'records')}>
+          <TabsList>
+            <TabsTrigger value="upload">Upload</TabsTrigger>
+            <TabsTrigger value="records">Records</TabsTrigger>
+          </TabsList>
+          <TabsContent value="upload" className="space-y-6 mt-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Destination</CardTitle>
@@ -304,22 +397,55 @@ const MediaUpload = () => {
             <CardTitle className="text-lg">Files</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-8 cursor-pointer hover:bg-accent/50 transition-colors">
+            <label
+              className={cn(
+                'flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-8 transition-colors',
+                destinationReady && !uploading
+                  ? 'cursor-pointer hover:bg-accent/50'
+                  : 'cursor-not-allowed opacity-60'
+              )}
+            >
               <Upload className="w-8 h-8 text-muted-foreground" />
-              <span className="text-sm font-medium">Click to choose photos or videos</span>
-              <span className="text-xs text-muted-foreground">Up to 50 files at a time · max 2 GB per file</span>
+              <span className="text-sm font-medium">
+                {destinationReady ? 'Click to choose photos or videos' : 'Select a school and class first'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {destinationReady
+                  ? 'Up to 50 files at a time · max 2 GB per file'
+                  : 'Uploading is disabled until a destination is chosen'}
+              </span>
               <input
                 type="file"
                 multiple
                 accept="image/*,video/*"
                 className="hidden"
                 onChange={onPick}
-                disabled={uploading}
+                disabled={uploading || !destinationReady}
               />
             </label>
 
+
             {items.length > 0 && (
               <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">
+                    {checkingDupes
+                      ? 'Checking for duplicates already in Drive…'
+                      : items.some((i) => i.duplicate)
+                      ? `${items.filter((i) => i.duplicate).length} possible duplicate(s) detected`
+                      : 'No duplicates detected'}
+                  </span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5"
+                      checked={skipDuplicates}
+                      onChange={(e) => setSkipDuplicates(e.target.checked)}
+                      disabled={uploading}
+                    />
+                    Skip duplicates
+                  </label>
+                </div>
                 {items.map((it, i) => (
                   <div key={i} className="p-2.5 rounded-md border border-border bg-card space-y-2">
                     <div className="flex items-center gap-3">
@@ -327,7 +453,16 @@ const MediaUpload = () => {
                         ? <FileVideo className="w-4 h-4 text-muted-foreground shrink-0" />
                         : <FileImage className="w-4 h-4 text-muted-foreground shrink-0" />}
                       <span className="flex-1 text-sm truncate">{it.name}</span>
+                      {it.duplicate && it.status === 'pending' && (
+                        <span className="text-xs text-warning flex items-center gap-1">
+                          <Copy className="w-3.5 h-3.5" />
+                          {it.duplicate === 'exact' ? 'Already uploaded' : 'Possible duplicate'}
+                        </span>
+                      )}
                       {it.status === 'pending' && <span className="text-xs text-muted-foreground">Pending</span>}
+                      {it.status === 'skipped' && (
+                        <span className="text-xs text-muted-foreground" title={it.message}>Skipped</span>
+                      )}
                       {it.status === 'uploading' && (
                         <span className="text-xs font-medium tabular-nums text-primary">{it.percent}%</span>
                       )}
@@ -355,6 +490,7 @@ const MediaUpload = () => {
               </div>
             )}
 
+
             {uploading && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
@@ -374,7 +510,11 @@ const MediaUpload = () => {
           </CardContent>
         </Card>
 
-        <MediaLibrary schools={schools} classes={classes} getClassName={getClassName} />
+          </TabsContent>
+          <TabsContent value="records" className="mt-4">
+            <MediaLibrary schools={schools} classes={classes} getClassName={getClassName} />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <AlertDialog open={askMore} onOpenChange={setAskMore}>
