@@ -1,57 +1,74 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import {
-  LayoutDashboard,
-  School,
-  BookOpen,
-  Users,
-  ClipboardCheck,
-  CalendarDays,
-  Award,
-  Menu,
-  MessageSquareText,
-  History,
-  Settings,
-  IndianRupee,
-  ListChecks,
-  ShieldCheck,
-  Settings2,
-  Upload,
-  CalendarClock,
-  Users2,
-  BarChart3,
-} from 'lucide-react';
+import { ChevronDown, Menu, Star, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import UserAvatar from '@/components/UserAvatar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useNavPrefs, MAX_FAVORITES } from '@/hooks/useNavPrefs';
+import { visibleSections, findNavItem, type NavItem } from '@/lib/navigation';
 import { useState, useEffect } from 'react';
 
-const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/manage', icon: School, label: 'Schools / Classes / Students' },
-  { to: '/attendance', icon: ClipboardCheck, label: 'Attendance' },
-  { to: '/media', icon: Upload, label: 'Upload Media' },
-  { to: '/topics', icon: MessageSquareText, label: 'Topic of the Day' },
-  { to: '/payments', icon: IndianRupee, label: 'Payments' },
-  { to: '/misc-tasks', icon: ListChecks, label: 'Miscellaneous Tasks' },
-  { to: '/grading', icon: Award, label: 'Grading' },
-  { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
-  { to: '/profile', icon: Settings, label: 'Profile' },
-];
+const NavRow = ({
+  item,
+  isActive,
+  onNavClick,
+}: {
+  item: NavItem;
+  isActive: boolean;
+  onNavClick?: () => void;
+}) => {
+  const { isFavorite, toggleFavorite, favorites } = useNavPrefs();
+  const pinned = isFavorite(item.to);
+  const atLimit = !pinned && favorites.length >= MAX_FAVORITES;
+  const Icon = item.icon;
 
-const adminNavItems = [
-  { to: '/schedule', icon: CalendarClock, label: 'Instructor Schedule' },
-  { to: '/instructor-attendance', icon: Users2, label: 'Instructor Attendance' },
-  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-  { to: '/activity-log', icon: History, label: 'Activity Log' },
-  { to: '/admin', icon: ShieldCheck, label: 'Admin Management' },
-  { to: '/admin-settings', icon: Settings2, label: 'Admin Settings' },
-];
+  return (
+    <div className="group/row relative flex items-center">
+      <NavLink
+        to={item.to}
+        onClick={onNavClick}
+        className={cn(
+          'group flex flex-1 min-w-0 items-center gap-3 pl-3 pr-8 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200',
+          isActive
+            ? 'bg-sidebar-primary/15 text-sidebar-primary shadow-sm'
+            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+        )}
+      >
+        <Icon
+          className={cn(
+            'w-[18px] h-[18px] shrink-0 transition-colors',
+            isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-accent-foreground'
+          )}
+        />
+        <span className="truncate">{item.label}</span>
+      </NavLink>
+      <button
+        type="button"
+        onClick={() => toggleFavorite(item.to)}
+        disabled={atLimit}
+        aria-label={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+        title={atLimit ? `You can pin up to ${MAX_FAVORITES} pages` : pinned ? 'Unpin' : 'Pin to favorites'}
+        className={cn(
+          'absolute right-1.5 p-1 rounded-md transition-opacity',
+          pinned
+            ? 'text-sidebar-primary opacity-100'
+            : 'text-sidebar-foreground/50 opacity-0 group-hover/row:opacity-100 hover:text-sidebar-primary disabled:cursor-not-allowed'
+        )}
+      >
+        <Star className={cn('w-3.5 h-3.5', pinned && 'fill-current')} />
+      </button>
+    </div>
+  );
+};
 
-
-const SidebarContent = ({ user, signOut, onNavClick, role }: { user: any; signOut: () => void; onNavClick?: () => void; role: string | null }) => {
+const SidebarContent = ({ onNavClick, role }: { onNavClick?: () => void; role: string | null }) => {
   const location = useLocation();
+  const { favorites, isSectionOpen, toggleSection } = useNavPrefs();
+  const sections = visibleSections(role);
+  const favItems = favorites
+    .map(findNavItem)
+    .filter((i): i is NavItem => Boolean(i));
 
   return (
     <div className="h-full flex flex-col bg-sidebar">
@@ -68,35 +85,59 @@ const SidebarContent = ({ user, signOut, onNavClick, role }: { user: any; signOu
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 mt-5 space-y-0.5 overflow-y-auto">
-        {[...navItems, ...(role === 'admin' ? adminNavItems : [])].map(({ to, icon: Icon, label }) => {
-          const isActive = location.pathname === to;
+      <nav className="flex-1 px-3 mt-4 space-y-3 overflow-y-auto pb-4">
+        {favItems.length > 0 && (
+          <div>
+            <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+              Favorites
+            </p>
+            <div className="space-y-0.5">
+              {favItems.map((item) => (
+                <NavRow
+                  key={`fav-${item.to}`}
+                  item={item}
+                  isActive={location.pathname === item.to}
+                  onNavClick={onNavClick}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {sections.map((section) => {
+          const open = isSectionOpen(section.id);
           return (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={onNavClick}
-              className={cn(
-                'group flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200',
-                isActive
-                  ? 'bg-sidebar-primary/15 text-sidebar-primary shadow-sm'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <Icon className={cn('w-[18px] h-[18px] transition-colors', isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-accent-foreground')} />
-              {label}
-            </NavLink>
+            <Collapsible key={section.id} open={open} onOpenChange={() => toggleSection(section.id)}>
+              <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors">
+                <span>{section.label}</span>
+                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', !open && '-rotate-90')} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-0.5 mt-0.5">
+                {section.items.map((item) => (
+                  <NavRow
+                    key={item.to}
+                    item={item}
+                    isActive={location.pathname === item.to}
+                    onNavClick={onNavClick}
+                  />
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
           );
         })}
       </nav>
 
+      <div className="px-4 py-3 border-t border-sidebar-border text-[11px] text-sidebar-foreground/50 flex items-center gap-1.5">
+        <Search className="w-3 h-3" />
+        Press <kbd className="px-1 py-0.5 rounded bg-sidebar-accent text-sidebar-accent-foreground">Ctrl</kbd>+
+        <kbd className="px-1 py-0.5 rounded bg-sidebar-accent text-sidebar-accent-foreground">K</kbd>
+      </div>
     </div>
   );
 };
 
 const AppSidebar = () => {
-  const { signOut, user, role } = useAuth();
+  const { role } = useAuth();
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const location = useLocation();
@@ -114,7 +155,7 @@ const AppSidebar = () => {
         </button>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetContent side="left" className="p-0 w-64 border-r-0">
-            <SidebarContent user={user} signOut={signOut} onNavClick={() => setOpen(false)} role={role} />
+            <SidebarContent onNavClick={() => setOpen(false)} role={role} />
           </SheetContent>
         </Sheet>
       </>
@@ -123,7 +164,7 @@ const AppSidebar = () => {
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 z-50 shadow-xl">
-      <SidebarContent user={user} signOut={signOut} role={role} />
+      <SidebarContent role={role} />
     </aside>
   );
 };

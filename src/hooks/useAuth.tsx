@@ -32,18 +32,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .select('role')
       .eq('user_id', userId)
       .maybeSingle();
-    setRole((data?.role as AppRole) ?? 'instructor');
+    // No implicit role: users without a user_roles record get no access.
+    setRole((data?.role as AppRole) ?? null);
   };
 
   useEffect(() => {
     let didInit = false;
 
     const handleSession = async (session: Session | null) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      // Keep loading true until the role is resolved, so protected routes never
+      // flash the "access pending" screen while the role query is in flight.
       if (session?.user) {
+        setLoading(true);
+        setSession(session);
+        setUser(session.user);
         await fetchRole(session.user.id);
       } else {
+        setSession(null);
+        setUser(null);
         setRole(null);
       }
       setLoading(false);

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -226,6 +226,431 @@ export type Database = {
         }
         Relationships: []
       }
+      flite_class_observations: {
+        Row: {
+          course: string | null
+          created_at: string
+          flite_teacher_name: string | null
+          hours: string | null
+          id: string
+          remarks: string | null
+          school_id: string
+          school_teacher: string | null
+          session_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          course?: string | null
+          created_at?: string
+          flite_teacher_name?: string | null
+          hours?: string | null
+          id?: string
+          remarks?: string | null
+          school_id: string
+          school_teacher?: string | null
+          session_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          course?: string | null
+          created_at?: string
+          flite_teacher_name?: string | null
+          hours?: string | null
+          id?: string
+          remarks?: string | null
+          school_id?: string
+          school_teacher?: string | null
+          session_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flite_class_observations_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "flite_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flite_kit_deliveries: {
+        Row: {
+          checked_by: string | null
+          couriered_date: string | null
+          created_at: string
+          id: string
+          prepared_by: string | null
+          program_name: string | null
+          quantity: number | null
+          received_on: string | null
+          school_id: string
+          tracking_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          checked_by?: string | null
+          couriered_date?: string | null
+          created_at?: string
+          id?: string
+          prepared_by?: string | null
+          program_name?: string | null
+          quantity?: number | null
+          received_on?: string | null
+          school_id: string
+          tracking_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          checked_by?: string | null
+          couriered_date?: string | null
+          created_at?: string
+          id?: string
+          prepared_by?: string | null
+          program_name?: string | null
+          quantity?: number | null
+          received_on?: string | null
+          school_id?: string
+          tracking_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flite_kit_deliveries_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "flite_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flite_programs: {
+        Row: {
+          course_name: string | null
+          created_at: string
+          curriculum_file_link: string | null
+          divisions_per_grade: number | null
+          grade: string | null
+          id: string
+          kit_cost: number | null
+          kit_student_sharing: string | null
+          no_of_kits: number | null
+          school_id: string
+          shelf_life: string | null
+          updated_at: string
+        }
+        Insert: {
+          course_name?: string | null
+          created_at?: string
+          curriculum_file_link?: string | null
+          divisions_per_grade?: number | null
+          grade?: string | null
+          id?: string
+          kit_cost?: number | null
+          kit_student_sharing?: string | null
+          no_of_kits?: number | null
+          school_id: string
+          shelf_life?: string | null
+          updated_at?: string
+        }
+        Update: {
+          course_name?: string | null
+          created_at?: string
+          curriculum_file_link?: string | null
+          divisions_per_grade?: number | null
+          grade?: string | null
+          id?: string
+          kit_cost?: number | null
+          kit_student_sharing?: string | null
+          no_of_kits?: number | null
+          school_id?: string
+          shelf_life?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flite_programs_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "flite_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flite_refresher_sessions: {
+        Row: {
+          course: string | null
+          created_at: string
+          flite_teacher_name: string | null
+          hours: string | null
+          id: string
+          mode: string | null
+          school_id: string
+          session_date: string | null
+          teachers_attended: number | null
+          updated_at: string
+        }
+        Insert: {
+          course?: string | null
+          created_at?: string
+          flite_teacher_name?: string | null
+          hours?: string | null
+          id?: string
+          mode?: string | null
+          school_id: string
+          session_date?: string | null
+          teachers_attended?: number | null
+          updated_at?: string
+        }
+        Update: {
+          course?: string | null
+          created_at?: string
+          flite_teacher_name?: string | null
+          hours?: string | null
+          id?: string
+          mode?: string | null
+          school_id?: string
+          session_date?: string | null
+          teachers_attended?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flite_refresher_sessions_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "flite_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flite_school_teachers: {
+        Row: {
+          courses: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          school_id: string
+          subjects: string | null
+          updated_at: string
+        }
+        Insert: {
+          courses?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          school_id: string
+          subjects?: string | null
+          updated_at?: string
+        }
+        Update: {
+          courses?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          school_id?: string
+          subjects?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flite_school_teachers_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "flite_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flite_schools: {
+        Row: {
+          address: string | null
+          city: string | null
+          contact_no: string | null
+          created_at: string
+          id: string
+          invoice_name: string | null
+          kit_delivery_date: string | null
+          mktg_coord_contact: string | null
+          mktg_coord_email: string | null
+          mktg_coord_name: string | null
+          name: string
+          notes: string | null
+          owner_id: string | null
+          payment_terms: string | null
+          principal_contact: string | null
+          principal_email: string | null
+          principal_name: string | null
+          region: string | null
+          school_coord_contact: string | null
+          school_coord_email: string | null
+          school_coord_name: string | null
+          school_full_name: string | null
+          status: Database["public"]["Enums"]["flite_status"]
+          teachers_count: number | null
+          tier: string | null
+          training_dates: string | null
+          training_days_committed: string | null
+          training_mode: string | null
+          updated_at: string
+          welcome_kit_delivered_date: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          contact_no?: string | null
+          created_at?: string
+          id?: string
+          invoice_name?: string | null
+          kit_delivery_date?: string | null
+          mktg_coord_contact?: string | null
+          mktg_coord_email?: string | null
+          mktg_coord_name?: string | null
+          name: string
+          notes?: string | null
+          owner_id?: string | null
+          payment_terms?: string | null
+          principal_contact?: string | null
+          principal_email?: string | null
+          principal_name?: string | null
+          region?: string | null
+          school_coord_contact?: string | null
+          school_coord_email?: string | null
+          school_coord_name?: string | null
+          school_full_name?: string | null
+          status?: Database["public"]["Enums"]["flite_status"]
+          teachers_count?: number | null
+          tier?: string | null
+          training_dates?: string | null
+          training_days_committed?: string | null
+          training_mode?: string | null
+          updated_at?: string
+          welcome_kit_delivered_date?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          contact_no?: string | null
+          created_at?: string
+          id?: string
+          invoice_name?: string | null
+          kit_delivery_date?: string | null
+          mktg_coord_contact?: string | null
+          mktg_coord_email?: string | null
+          mktg_coord_name?: string | null
+          name?: string
+          notes?: string | null
+          owner_id?: string | null
+          payment_terms?: string | null
+          principal_contact?: string | null
+          principal_email?: string | null
+          principal_name?: string | null
+          region?: string | null
+          school_coord_contact?: string | null
+          school_coord_email?: string | null
+          school_coord_name?: string | null
+          school_full_name?: string | null
+          status?: Database["public"]["Enums"]["flite_status"]
+          teachers_count?: number | null
+          tier?: string | null
+          training_dates?: string | null
+          training_days_committed?: string | null
+          training_mode?: string | null
+          updated_at?: string
+          welcome_kit_delivered_date?: string | null
+        }
+        Relationships: []
+      }
+      flite_trainings: {
+        Row: {
+          certificates_given_date: string | null
+          course: string | null
+          created_at: string
+          flite_teacher_name: string | null
+          hours: string | null
+          id: string
+          mode: string | null
+          school_id: string
+          session_date: string | null
+          teachers_attended: number | null
+          updated_at: string
+        }
+        Insert: {
+          certificates_given_date?: string | null
+          course?: string | null
+          created_at?: string
+          flite_teacher_name?: string | null
+          hours?: string | null
+          id?: string
+          mode?: string | null
+          school_id: string
+          session_date?: string | null
+          teachers_attended?: number | null
+          updated_at?: string
+        }
+        Update: {
+          certificates_given_date?: string | null
+          course?: string | null
+          created_at?: string
+          flite_teacher_name?: string | null
+          hours?: string | null
+          id?: string
+          mode?: string | null
+          school_id?: string
+          session_date?: string | null
+          teachers_attended?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flite_trainings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "flite_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flite_welcome_deliveries: {
+        Row: {
+          created_at: string
+          date_delivered: string | null
+          delivered_by: string | null
+          delivered_to: string | null
+          id: string
+          items: string | null
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date_delivered?: string | null
+          delivered_by?: string | null
+          delivered_to?: string | null
+          id?: string
+          items?: string | null
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date_delivered?: string | null
+          delivered_by?: string | null
+          delivered_to?: string | null
+          id?: string
+          items?: string | null
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flite_welcome_deliveries_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "flite_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grading: {
         Row: {
           class_id: string
@@ -362,6 +787,263 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      marketing_curriculum_programs: {
+        Row: {
+          age_group: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          duration_weeks: number | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          age_group?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_weeks?: number | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          age_group?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_weeks?: number | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_curriculum_sessions: {
+        Row: {
+          activities: string | null
+          created_at: string
+          id: string
+          materials: string | null
+          objectives: string | null
+          program_id: string
+          session_no: number
+          title: string
+        }
+        Insert: {
+          activities?: string | null
+          created_at?: string
+          id?: string
+          materials?: string | null
+          objectives?: string | null
+          program_id: string
+          session_no: number
+          title: string
+        }
+        Update: {
+          activities?: string | null
+          created_at?: string
+          id?: string
+          materials?: string | null
+          objectives?: string | null
+          program_id?: string
+          session_no?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_curriculum_sessions_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_curriculum_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_school_contacts: {
+        Row: {
+          created_at: string
+          designation: string | null
+          email: string | null
+          id: string
+          is_primary: boolean
+          name: string
+          phone: string | null
+          school_id: string
+          whatsapp: string | null
+        }
+        Insert: {
+          created_at?: string
+          designation?: string | null
+          email?: string | null
+          id?: string
+          is_primary?: boolean
+          name: string
+          phone?: string | null
+          school_id: string
+          whatsapp?: string | null
+        }
+        Update: {
+          created_at?: string
+          designation?: string | null
+          email?: string | null
+          id?: string
+          is_primary?: boolean
+          name?: string
+          phone?: string | null
+          school_id?: string
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_school_contacts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_school_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          school_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          school_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_school_history_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_schools: {
+        Row: {
+          address: string | null
+          area: string | null
+          board: string | null
+          city: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          type: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          area?: string | null
+          board?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          type?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          area?: string | null
+          board?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          type?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      marketing_visits: {
+        Row: {
+          agenda: string | null
+          amount: number | null
+          coordinator_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          next_follow_up: string | null
+          notes: string | null
+          outcome: string | null
+          school_id: string
+          status: Database["public"]["Enums"]["marketing_visit_status"]
+          updated_at: string
+          visit_date: string
+        }
+        Insert: {
+          agenda?: string | null
+          amount?: number | null
+          coordinator_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          next_follow_up?: string | null
+          notes?: string | null
+          outcome?: string | null
+          school_id: string
+          status?: Database["public"]["Enums"]["marketing_visit_status"]
+          updated_at?: string
+          visit_date?: string
+        }
+        Update: {
+          agenda?: string | null
+          amount?: number | null
+          coordinator_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          next_follow_up?: string | null
+          notes?: string | null
+          outcome?: string | null
+          school_id?: string
+          status?: Database["public"]["Enums"]["marketing_visit_status"]
+          updated_at?: string
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_visits_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_schools"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       misc_tasks: {
         Row: {
@@ -689,6 +1371,7 @@ export type Database = {
           total_bytes: number
         }[]
       }
+      has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -699,6 +1382,12 @@ export type Database = {
     }
     Enums: {
       app_role: "instructor" | "admin"
+      flite_status: "prospect" | "active" | "paused" | "churned"
+      marketing_visit_status:
+        | "interested"
+        | "follow_up"
+        | "deal_closed"
+        | "not_interested"
       misc_task_status: "done" | "pending" | "not_applicable" | "granted"
       payment_status: "paid" | "not_paid"
     }
@@ -716,12 +1405,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -745,11 +1434,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -770,11 +1459,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -795,11 +1484,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -812,11 +1501,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -829,6 +1518,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["instructor", "admin"],
+      flite_status: ["prospect", "active", "paused", "churned"],
+      marketing_visit_status: [
+        "interested",
+        "follow_up",
+        "deal_closed",
+        "not_interested",
+      ],
       misc_task_status: ["done", "pending", "not_applicable", "granted"],
       payment_status: ["paid", "not_paid"],
     },
