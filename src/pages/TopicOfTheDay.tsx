@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { logActivity } from '@/lib/activityLogger';
 import DashboardLayout from '@/components/DashboardLayout';
+import TopicSuggestInput from '@/components/TopicSuggestInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -312,9 +313,10 @@ const TopicOfTheDay = () => {
               </div>
               <div>
                 <Label className="mb-1.5 block">Topic</Label>
-                <Input
+                <TopicSuggestInput
                   value={topicText}
-                  onChange={e => setTopicText(e.target.value)}
+                  onChange={setTopicText}
+                  program={allClasses.find(c => c.id === filterClass)?.name}
                   placeholder="Enter topic of the day"
                 />
               </div>

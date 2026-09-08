@@ -251,6 +251,12 @@ const Schools = () => {
     const schoolsToExport = scope === 'selected' ? filtered.filter(s => selected.has(s.id)) : filtered;
     if (schoolsToExport.length === 0) { toast.error(scope === 'selected' ? 'No schools selected' : 'No schools to export'); return; }
     toast.info('Preparing PDF export...');
+    const esc = (v: unknown) => String(v ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
     try {
       const ids = schoolsToExport.map(s => s.id);
       const [classesRes, allStudentsData, allAttendanceData] = await Promise.all([
@@ -267,13 +273,13 @@ const Schools = () => {
         const schoolClasses = allClassesData.filter(c => c.school_id === school.id);
         
         htmlContent += `<div style="page-break-before:${htmlContent ? 'always' : 'auto'};">`;
-        htmlContent += `<h1 style="font-size:18px;margin-bottom:8px;">${school.name}</h1>`;
+        htmlContent += `<h1 style="font-size:18px;margin-bottom:8px;">${esc(school.name)}</h1>`;
         htmlContent += `<table style="border-collapse:collapse;width:100%;margin-bottom:20px;">`;
-        htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">Address</td><td style="border:1px solid #ccc;padding:5px 8px;">${school.address || '—'}</td></tr>`;
-        htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">Days</td><td style="border:1px solid #ccc;padding:5px 8px;">${(school.days ?? []).join(', ') || '—'}</td></tr>`;
-        htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">IR Coordinator</td><td style="border:1px solid #ccc;padding:5px 8px;">${school.ir_coordinator_name || '—'} ${school.ir_coordinator_mobile ? `(${school.ir_coordinator_mobile})` : ''}</td></tr>`;
-        htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">Primary Coordinator</td><td style="border:1px solid #ccc;padding:5px 8px;">${school.primary_coordinator_name || '—'} ${school.primary_coordinator_mobile ? `(${school.primary_coordinator_mobile})` : ''}</td></tr>`;
-        htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">Secondary Coordinator</td><td style="border:1px solid #ccc;padding:5px 8px;">${school.secondary_coordinator_name || '—'} ${school.secondary_coordinator_mobile ? `(${school.secondary_coordinator_mobile})` : ''}</td></tr>`;
+        htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">Address</td><td style="border:1px solid #ccc;padding:5px 8px;">${esc(school.address) || '—'}</td></tr>`;
+        htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">Days</td><td style="border:1px solid #ccc;padding:5px 8px;">${esc((school.days ?? []).join(', ')) || '—'}</td></tr>`;
+        htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">IR Coordinator</td><td style="border:1px solid #ccc;padding:5px 8px;">${esc(school.ir_coordinator_name) || '—'} ${school.ir_coordinator_mobile ? `(${esc(school.ir_coordinator_mobile)})` : ''}</td></tr>`;
+        htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">Primary Coordinator</td><td style="border:1px solid #ccc;padding:5px 8px;">${esc(school.primary_coordinator_name) || '—'} ${school.primary_coordinator_mobile ? `(${esc(school.primary_coordinator_mobile)})` : ''}</td></tr>`;
+        htmlContent += `<tr><td style="border:1px solid #ccc;padding:5px 8px;font-weight:bold;background:#FFD966;">Secondary Coordinator</td><td style="border:1px solid #ccc;padding:5px 8px;">${esc(school.secondary_coordinator_name) || '—'} ${school.secondary_coordinator_mobile ? `(${esc(school.secondary_coordinator_mobile)})` : ''}</td></tr>`;
         htmlContent += `</table>`;
 
         for (const cls of schoolClasses) {
@@ -292,8 +298,8 @@ const Schools = () => {
           });
 
           const sheetLabel = [cls.name, cls.grade, cls.div].filter(Boolean).join(' - ');
-          htmlContent += `<h2 style="font-size:14px;margin:16px 0 6px;">${sheetLabel}</h2>`;
-          htmlContent += `<p style="font-size:11px;color:#666;margin-bottom:6px;">Day: ${cls.day || '—'} | Timing: ${cls.timing || '—'} | Instructor(s): ${cls.instructor_names || '—'} | Venue: ${cls.venue || '—'}</p>`;
+          htmlContent += `<h2 style="font-size:14px;margin:16px 0 6px;">${esc(sheetLabel)}</h2>`;
+          htmlContent += `<p style="font-size:11px;color:#666;margin-bottom:6px;">Day: ${esc(cls.day) || '—'} | Timing: ${esc(cls.timing) || '—'} | Instructor(s): ${esc(cls.instructor_names) || '—'} | Venue: ${esc(cls.venue) || '—'}</p>`;
           
           htmlContent += `<table style="border-collapse:collapse;width:100%;margin-bottom:16px;font-size:9px;">`;
           htmlContent += `<tr><th style="border:1px solid #333;padding:4px;background:#FFD966;font-weight:bold;text-align:left;">Student</th><th style="border:1px solid #333;padding:4px;background:#FFD966;">Grade</th><th style="border:1px solid #333;padding:4px;background:#FFD966;">Div</th><th style="border:1px solid #333;padding:4px;background:#FFD966;">Total</th>`;
@@ -301,7 +307,7 @@ const Schools = () => {
             const d = k.split('|')[0];
             const topic = k.split('|')[1] || '';
             const parsed = new Date(d + 'T00:00:00');
-            htmlContent += `<th style="border:1px solid #333;padding:4px;background:#FFD966;font-size:8px;">${parsed.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}<br/>${DAY_NAMES[parsed.getDay()].slice(0,3)}<br/><span style="font-weight:normal;font-size:7px;">${topic}</span></th>`;
+            htmlContent += `<th style="border:1px solid #333;padding:4px;background:#FFD966;font-size:8px;">${parsed.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}<br/>${DAY_NAMES[parsed.getDay()].slice(0,3)}<br/><span style="font-weight:normal;font-size:7px;">${esc(topic)}</span></th>`;
           }
           htmlContent += `</tr>`;
           
@@ -316,7 +322,7 @@ const Schools = () => {
               return '';
             });
             const attended = statuses.filter(x => x === 'P' || x === 'K' || x === 'Q').length;
-            htmlContent += `<tr><td style="border:1px solid #ccc;padding:3px 5px;">${s.full_name}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;">${s.grade ?? ''}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;">${s.div ?? ''}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;font-weight:bold;">${attended}/${sessionKeys.length}</td>`;
+            htmlContent += `<tr><td style="border:1px solid #ccc;padding:3px 5px;">${esc(s.full_name)}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;">${esc(s.grade)}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;">${esc(s.div)}</td><td style="border:1px solid #ccc;padding:3px;text-align:center;font-weight:bold;">${attended}/${sessionKeys.length}</td>`;
             for (const st of statuses) {
               let bg = '';
               if (st === 'P') bg = 'background:#C6EFCE;color:#006100;font-weight:bold;text-align:center;';
