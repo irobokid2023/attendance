@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { logActivity } from '@/lib/activityLogger';
@@ -21,6 +21,7 @@ import { exportToExcel } from '@/lib/exportExcel';
 import CurriculumImportDialog from '@/components/CurriculumImportDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { clearPageDraft, readPageDraft, writePageDraft } from '@/lib/pageDrafts';
 
 
 const capitalize = (str: string) =>
@@ -51,6 +52,11 @@ const TopicOfTheDay = () => {
   const [topicText, setTopicText] = useState('');
   const [saving, setSaving] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const [loadedTopicDraftKey, setLoadedTopicDraftKey] = useState('');
+  const [topicDraftEnabled, setTopicDraftEnabled] = useState(false);
+  const [topicFiltersRestored, setTopicFiltersRestored] = useState(false);
+  const restoringTopicFilters = useRef(false);
+  const topicDraftKey = filterClass ? `topic:${filterClass}:${format(selectedDate, 'yyyy-MM-dd')}` : '';
 
   // View Records state
   const [recSchool, setRecSchool] = useState('');
@@ -104,9 +110,20 @@ const TopicOfTheDay = () => {
     ]).then(([schoolsRes, classesRes]) => {
       setSchools(schoolsRes.data ?? []);
       setAllClasses(classesRes.data ?? []);
+      const savedView = user ? readPageDraft<{ schoolId: string; classId: string; date: string }>(user.id, 'topic-view') : null;
+      if (savedView && (classesRes.data ?? []).some((cls) => cls.id === savedView.classId && cls.school_id === savedView.schoolId)) {
+        restoringTopicFilters.current = true;
+        setFilterSchool(savedView.schoolId);
+        setFilterClass(savedView.classId);
+        if (savedView.date) {
+          const [year, month, day] = savedView.date.split('-').map(Number);
+          if (year && month && day) setSelectedDate(new Date(year, month - 1, day));
+        }
+      }
+      setTopicFiltersRestored(true);
     });
     loadCurriculum();
-  }, []);
+  }, [user?.id]);
 
   const handleAddCurriculum = async () => {
     if (!curProgram || !curSession || !curTopic.trim()) {
@@ -163,8 +180,32 @@ const TopicOfTheDay = () => {
     return allClasses.filter(c => c.school_id === recSchool);
   }, [allClasses, recSchool]);
 
-  useEffect(() => { setFilterClass(''); }, [filterSchool]);
+  useEffect(() => {
+    if (restoringTopicFilters.current) {
+      restoringTopicFilters.current = false;
+      return;
+    }
+    setFilterClass('');
+  }, [filterSchool]);
   useEffect(() => { setRecClass(''); }, [recSchool]);
+
+  useEffect(() => {
+    if (!user || !topicFiltersRestored) return;
+    writePageDraft(user.id, 'topic-view', { schoolId: filterSchool, classId: filterClass, date: format(selectedDate, 'yyyy-MM-dd') });
+  }, [user?.id, topicFiltersRestored, filterSchool, filterClass, selectedDate]);
+
+  useEffect(() => {
+    if (!user || !topicDraftKey) return;
+    const draft = readPageDraft<string>(user.id, topicDraftKey);
+    setTopicText(draft ?? '');
+    setTopicDraftEnabled(Boolean(draft));
+    setLoadedTopicDraftKey(topicDraftKey);
+  }, [user?.id, topicDraftKey]);
+
+  useEffect(() => {
+    if (!user || !topicDraftKey || loadedTopicDraftKey !== topicDraftKey || !topicDraftEnabled) return;
+    writePageDraft(user.id, topicDraftKey, topicText);
+  }, [user?.id, topicDraftKey, loadedTopicDraftKey, topicDraftEnabled, topicText]);
 
   const handleSaveTopic = async () => {
     if (!filterClass || !topicText.trim()) {
@@ -205,6 +246,8 @@ const TopicOfTheDay = () => {
         logActivity({ action: 'created', section: 'topics', description: `Added topic for ${clsLabel}` });
       }
       setTopicText('');
+      clearPageDraft(user.id, topicDraftKey);
+      setTopicDraftEnabled(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to save topic');
     } finally {
@@ -315,7 +358,7 @@ const TopicOfTheDay = () => {
                 <Label className="mb-1.5 block">Topic</Label>
                 <TopicSuggestInput
                   value={topicText}
-                  onChange={setTopicText}
+                  onChange={(value) => { setTopicText(value); setTopicDraftEnabled(true); }}
                   program={allClasses.find(c => c.id === filterClass)?.name}
                   placeholder="Enter topic of the day"
                 />

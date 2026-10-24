@@ -24,17 +24,13 @@ import HolidayCalendar from "./pages/HolidayCalendar";
 import Grading from "./pages/Grading";
 import Profile from "./pages/Profile";
 import ActivityLog from "./pages/ActivityLog";
+import AttendanceQA from "./pages/AttendanceQA";
 import AdminManagement from "./pages/AdminManagement";
 import AdminSettings from "./pages/AdminSettings";
 import AdminSchedule from "./pages/AdminSchedule";
 import InstructorAttendance from "./pages/InstructorAttendance";
 import Analytics from "./pages/Analytics";
 import ResetPassword from "./pages/ResetPassword";
-import MarketingDailyLog from "./pages/MarketingDailyLog";
-import MarketingDatabase from "./pages/MarketingDatabase";
-import MarketingHistory from "./pages/MarketingHistory";
-import MarketingCurriculum from "./pages/MarketingCurriculum";
-import FliteSchools from "./pages/FliteSchools";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -71,11 +67,7 @@ const App = () => (
             <Route path="/schedule" element={<ProtectedRoute adminOnly><AdminSchedule /></ProtectedRoute>} />
             <Route path="/instructor-attendance" element={<ProtectedRoute adminOnly><InstructorAttendance /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute adminOnly><Analytics /></ProtectedRoute>} />
-            <Route path="/marketing-log" element={<ProtectedRoute adminOnly><MarketingDailyLog /></ProtectedRoute>} />
-            <Route path="/marketing-database" element={<ProtectedRoute adminOnly><MarketingDatabase /></ProtectedRoute>} />
-            <Route path="/marketing-history" element={<ProtectedRoute adminOnly><MarketingHistory /></ProtectedRoute>} />
-            <Route path="/marketing-curriculum" element={<ProtectedRoute adminOnly><MarketingCurriculum /></ProtectedRoute>} />
-            <Route path="/flite-schools" element={<ProtectedRoute adminOnly><FliteSchools /></ProtectedRoute>} />
+            <Route path="/attendance-qa" element={<ProtectedRoute adminOnly><AttendanceQA /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

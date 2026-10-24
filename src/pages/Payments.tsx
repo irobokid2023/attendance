@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchAllPaginated } from '@/lib/fetchAllAttendance';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import ExportDropdown from '@/components/ExportDropdown';
 import { exportToExcel } from '@/lib/exportExcel';
 import { exportToPdf } from '@/lib/exportPdf';
+import { clearPageDraft, readPageDraft, writePageDraft } from '@/lib/pageDrafts';
 
 type PaymentStatus = 'paid' | 'not_paid';
 
@@ -62,6 +63,11 @@ const Payments = () => {
   const [recordsStudents, setRecordsStudents] = useState<any[]>([]);
   const [recordsPayments, setRecordsPayments] = useState<Record<string, PaymentStatus>>({});
   const [recordsLoading, setRecordsLoading] = useState(false);
+  const [loadedDraftKey, setLoadedDraftKey] = useState('');
+  const [draftEnabled, setDraftEnabled] = useState(false);
+  const [filtersRestored, setFiltersRestored] = useState(false);
+  const restoringFilters = useRef(false);
+  const paymentsDraftKey = filterClass ? `payments:${filterClass}` : '';
 
   useEffect(() => {
     Promise.all([
@@ -70,8 +76,16 @@ const Payments = () => {
     ]).then(([schoolsRes, classesRes]) => {
       setSchools(schoolsRes.data ?? []);
       setAllClasses(classesRes.data ?? []);
+      const savedView = user ? readPageDraft<{ schoolId: string; classId: string; day: string }>(user.id, 'payments-view') : null;
+      if (savedView && (classesRes.data ?? []).some((cls) => cls.id === savedView.classId && cls.school_id === savedView.schoolId)) {
+        restoringFilters.current = true;
+        setFilterSchool(savedView.schoolId);
+        setFilterClass(savedView.classId);
+        setFilterDay(savedView.day || '');
+      }
+      setFiltersRestored(true);
     });
-  }, []);
+  }, [user?.id]);
 
   const filteredClasses = useMemo(() => {
     if (!filterSchool) return [];
@@ -91,8 +105,20 @@ const Payments = () => {
     return [...days].sort();
   }, [allClasses, filterSchool]);
 
-  useEffect(() => { setFilterClass(''); setFilterDay(''); }, [filterSchool]);
+  useEffect(() => {
+    if (restoringFilters.current) {
+      restoringFilters.current = false;
+      return;
+    }
+    setFilterClass('');
+    setFilterDay('');
+  }, [filterSchool]);
   useEffect(() => { setRecordsClass(''); }, [recordsSchool]);
+
+  useEffect(() => {
+    if (!user || !filtersRestored) return;
+    writePageDraft(user.id, 'payments-view', { schoolId: filterSchool, classId: filterClass, day: filterDay });
+  }, [user?.id, filtersRestored, filterSchool, filterClass, filterDay]);
 
   // Fetch students & existing payments for Mark tab
   useEffect(() => {
@@ -116,11 +142,21 @@ const Payments = () => {
         map[p.student_id] = p.status;
         existing[p.student_id] = { id: p.id, status: p.status };
       });
-      setPayments(map);
+      const draft = user && paymentsDraftKey
+        ? readPageDraft<Record<string, PaymentStatus>>(user.id, paymentsDraftKey)
+        : null;
+      setPayments(draft ?? map);
       setExistingPayments(existing);
+      setDraftEnabled(Boolean(draft));
+      setLoadedDraftKey(paymentsDraftKey);
     };
     fetchData();
-  }, [filterClass]);
+  }, [filterClass, user?.id]);
+
+  useEffect(() => {
+    if (!user || !paymentsDraftKey || loadedDraftKey !== paymentsDraftKey || !draftEnabled) return;
+    writePageDraft(user.id, paymentsDraftKey, payments);
+  }, [user?.id, paymentsDraftKey, loadedDraftKey, draftEnabled, payments]);
 
   // Records tab
   useEffect(() => {
@@ -148,10 +184,12 @@ const Payments = () => {
   }, [activeTab, recordsClass]);
 
   const setStudentStatus = (studentId: string, status: PaymentStatus) => {
+    setDraftEnabled(true);
     setPayments(prev => ({ ...prev, [studentId]: status }));
   };
 
   const markAll = (status: PaymentStatus) => {
+    setDraftEnabled(true);
     const updated: Record<string, PaymentStatus> = {};
     students.forEach(s => { updated[s.id] = status; });
     setPayments(prev => ({ ...prev, ...updated }));
@@ -182,6 +220,8 @@ const Payments = () => {
       if (error) throw error;
 
       toast.success('Payments saved!');
+      clearPageDraft(user.id, paymentsDraftKey);
+      setDraftEnabled(false);
       const cls = allClasses.find(c => c.id === filterClass);
       logActivity({
         action: 'created',

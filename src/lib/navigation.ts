@@ -14,10 +14,7 @@ import {
   CalendarClock,
   Users2,
   BarChart3,
-  NotebookPen,
-  Database,
-  Building2,
-  BookMarked,
+  Sparkles,
   User,
   type LucideIcon,
 } from 'lucide-react';
@@ -65,18 +62,6 @@ export const navSections: NavSection[] = [
     ],
   },
   {
-    id: 'marketing',
-    label: 'Marketing Portal',
-    adminOnly: true,
-    items: [
-      { to: '/marketing-log', icon: NotebookPen, label: 'Daily Visit Log', adminOnly: true },
-      { to: '/marketing-database', icon: Database, label: 'Visit Database', adminOnly: true },
-      { to: '/marketing-history', icon: History, label: 'School History', adminOnly: true },
-      { to: '/flite-schools', icon: Building2, label: 'Flite Schools', adminOnly: true },
-      { to: '/marketing-curriculum', icon: BookMarked, label: 'Curriculum', adminOnly: true },
-    ],
-  },
-  {
     id: 'admin',
     label: 'Administration',
     adminOnly: true,
@@ -84,6 +69,7 @@ export const navSections: NavSection[] = [
       { to: '/schedule', icon: CalendarClock, label: 'Instructor Schedule', adminOnly: true },
       { to: '/instructor-attendance', icon: Users2, label: 'Instructor Attendance', adminOnly: true },
       { to: '/analytics', icon: BarChart3, label: 'Analytics', adminOnly: true },
+      { to: '/attendance-qa', icon: Sparkles, label: 'Ask Attendance', adminOnly: true },
       { to: '/activity-log', icon: History, label: 'Activity Log', adminOnly: true },
       { to: '/admin', icon: ShieldCheck, label: 'Admin Management', adminOnly: true },
       { to: '/admin-settings', icon: Settings2, label: 'Admin Settings', adminOnly: true },

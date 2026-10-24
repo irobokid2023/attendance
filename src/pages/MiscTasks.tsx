@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle2, Clock, MinusCircle, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logActivity } from '@/lib/activityLogger';
+import { clearPageDraft, readPageDraft, writePageDraft } from '@/lib/pageDrafts';
 
 const TASKS: { key: string; label: string }[] = [
   { key: 'agreement_signed', label: 'Agreement Signed' },
@@ -41,10 +42,12 @@ const MiscTasks = () => {
   const [records, setRecords] = useState<Record<string, Status>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadedDraft, setLoadedDraft] = useState(false);
+  const [draftEnabled, setDraftEnabled] = useState(false);
 
   useEffect(() => {
-    fetchAll();
-  }, []);
+    if (user) fetchAll();
+  }, [user?.id]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -58,11 +61,20 @@ const MiscTasks = () => {
       map[`${r.school_id}:${r.task_key}`] = r.status as Status;
     });
     setSavedRecords(map);
-    setRecords(map);
+    const draft = user ? readPageDraft<Record<string, Status>>(user.id, 'misc-tasks') : null;
+    setRecords(draft ?? map);
+    setDraftEnabled(Boolean(draft));
+    setLoadedDraft(true);
     setLoading(false);
   };
 
+  useEffect(() => {
+    if (!user || !loadedDraft || !draftEnabled) return;
+    writePageDraft(user.id, 'misc-tasks', records);
+  }, [user?.id, loadedDraft, draftEnabled, records]);
+
   const cycleStatus = (schoolId: string, taskKey: string) => {
+    setDraftEnabled(true);
     const cellKey = `${schoolId}:${taskKey}`;
     const current = records[cellKey] || 'pending';
     const next = NEXT[current];
@@ -93,6 +105,8 @@ const MiscTasks = () => {
       return;
     }
     setSavedRecords({ ...records });
+    clearPageDraft(user.id, 'misc-tasks');
+    setDraftEnabled(false);
     toast.success(`Saved ${rows.length} change${rows.length > 1 ? 's' : ''}`);
     logActivity({
       action: 'updated',

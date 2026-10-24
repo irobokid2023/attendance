@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchAllPaginated } from '@/lib/fetchAllAttendance';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Trash2 } from 'lucide-react';
+import { clearPageDraft, readPageDraft, writePageDraft } from '@/lib/pageDrafts';
 
 type Status = 'present' | 'absent' | 'kit' | 'quiz' | 'left';
 
@@ -77,6 +78,10 @@ const Attendance = () => {
   const [existingSessions, setExistingSessions] = useState<string[]>([]); // list of topics for date
   const [selectedSession, setSelectedSession] = useState<string | null>(null); // topic of session being edited, null = new
   const [isNewSession, setIsNewSession] = useState(false);
+  const [loadedDraftKey, setLoadedDraftKey] = useState('');
+  const [draftEnabled, setDraftEnabled] = useState(false);
+  const [filtersRestored, setFiltersRestored] = useState(false);
+  const restoringFilters = useRef(false);
 
   // Records state - sessionKeys are "date|topic" composites
   const [attendanceMap, setAttendanceMap] = useState<Record<string, Record<string, Status>>>({});
@@ -84,6 +89,7 @@ const Attendance = () => {
   const [sessionInfoMap, setSessionInfoMap] = useState<Record<string, { date: string; topic: string }>>({});
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
+  const attendanceDraftKey = filterClass ? `attendance:${filterClass}:${dateStr}` : '';
 
   // Load app setting for holiday alerts
   useEffect(() => {
@@ -122,8 +128,20 @@ const Attendance = () => {
     ]).then(([schoolsRes, classesRes]) => {
       setSchools(schoolsRes.data ?? []);
       setAllClasses(classesRes.data ?? []);
+      const savedView = user ? readPageDraft<{ schoolId: string; classId: string; day: string; date: string }>(user.id, 'attendance-view') : null;
+      if (savedView && (classesRes.data ?? []).some((cls) => cls.id === savedView.classId && cls.school_id === savedView.schoolId)) {
+        restoringFilters.current = true;
+        setFilterSchool(savedView.schoolId);
+        setFilterClass(savedView.classId);
+        setFilterDay(savedView.day || '');
+        if (savedView.date) {
+          const [year, month, day] = savedView.date.split('-').map(Number);
+          if (year && month && day) setSelectedDate(new Date(year, month - 1, day));
+        }
+      }
+      setFiltersRestored(true);
     });
-  }, []);
+  }, [user?.id]);
 
   const filteredClasses = useMemo(() => {
     if (!filterSchool) return [];
@@ -139,7 +157,19 @@ const Attendance = () => {
     return [...days].sort();
   }, [allClasses, filterSchool]);
 
-  useEffect(() => { setFilterClass(''); setFilterDay(''); }, [filterSchool]);
+  useEffect(() => {
+    if (restoringFilters.current) {
+      restoringFilters.current = false;
+      return;
+    }
+    setFilterClass('');
+    setFilterDay('');
+  }, [filterSchool]);
+
+  useEffect(() => {
+    if (!user || !filtersRestored) return;
+    writePageDraft(user.id, 'attendance-view', { schoolId: filterSchool, classId: filterClass, day: filterDay, date: dateStr });
+  }, [user?.id, filtersRestored, filterSchool, filterClass, filterDay, dateStr]);
 
   // Fetch students & attendance for Mark tab
   useEffect(() => {
@@ -178,6 +208,19 @@ const Attendance = () => {
 
       const suggestedTopic = (dayTopicRes.data as any)?.topic || '';
 
+      const savedDraft = user && attendanceDraftKey
+        ? readPageDraft<{ attendance: Record<string, Status>; topic: string; selectedSession: string | null; isNewSession: boolean }>(user.id, attendanceDraftKey)
+        : null;
+      if (savedDraft) {
+        setAttendance(savedDraft.attendance ?? {});
+        setTopic(savedDraft.topic ?? '');
+        setSelectedSession(savedDraft.selectedSession ?? null);
+        setIsNewSession(savedDraft.isNewSession ?? false);
+        setDraftEnabled(true);
+        setLoadedDraftKey(attendanceDraftKey);
+        return;
+      }
+
       if (topics.length > 0 && !isNewSession) {
         // Load first session by default
         const firstTopic = topics[0];
@@ -197,14 +240,22 @@ const Attendance = () => {
         setAttendance({});
         setTopic(suggestedTopic);
       }
+      setDraftEnabled(false);
+      setLoadedDraftKey(attendanceDraftKey);
     };
 
     fetchAll();
-  }, [filterClass, dateStr]);
+  }, [filterClass, dateStr, user?.id]);
+
+  useEffect(() => {
+    if (!user || !attendanceDraftKey || loadedDraftKey !== attendanceDraftKey || !draftEnabled) return;
+    writePageDraft(user.id, attendanceDraftKey, { attendance, topic, selectedSession, isNewSession });
+  }, [user?.id, attendanceDraftKey, loadedDraftKey, draftEnabled, attendance, topic, selectedSession, isNewSession]);
 
 
   // Load specific session when user selects one
   const loadSession = async (sessionTopic: string) => {
+    setDraftEnabled(true);
     setSelectedSession(sessionTopic);
     setTopic(sessionTopic);
     setIsNewSession(false);
@@ -220,6 +271,7 @@ const Attendance = () => {
   };
 
   const startNewSession = () => {
+    setDraftEnabled(true);
     setIsNewSession(true);
     setSelectedSession(null);
     setAttendance({});
@@ -271,6 +323,7 @@ const Attendance = () => {
   const filteredStudents = useMemo(() => students, [students]);
 
   const cycleStudentStatus = (studentId: string) => {
+    setDraftEnabled(true);
     setAttendance(prev => {
       const current = prev[studentId];
       const currentIndex = current ? ALL_STATUSES.indexOf(current) : -1;
@@ -280,6 +333,7 @@ const Attendance = () => {
   };
 
   const setStudentStatus = (studentId: string, status: Status) => {
+    setDraftEnabled(true);
     setAttendance(prev => ({ ...prev, [studentId]: status }));
   };
 
@@ -323,6 +377,8 @@ const Attendance = () => {
     if (error) toast.error(error.message);
 
     else {
+      clearPageDraft(user.id, attendanceDraftKey);
+      setDraftEnabled(false);
       toast.success('Attendance saved!');
       const cls = allClasses.find(c => c.id === filterClass);
       logActivity({ action: selectedSession ? 'updated' : 'created', section: 'attendance', description: `${selectedSession ? 'Updated' : 'Marked'} attendance for ${cls ? getClassName(cls) : 'class'} on ${dateStr} - ${trimmedTopic}` });
@@ -394,6 +450,7 @@ const Attendance = () => {
   };
 
   const markAll = (status: Status) => {
+    setDraftEnabled(true);
     const updated: Record<string, Status> = {};
     filteredStudents.forEach(s => { updated[s.id] = status; });
     setAttendance(prev => ({ ...prev, ...updated }));
@@ -568,7 +625,7 @@ const Attendance = () => {
                   <label className="text-sm font-medium text-foreground">Topic of the Day *</label>
                   <TopicSuggestInput
                     value={topic}
-                    onChange={setTopic}
+                    onChange={(value) => { setTopic(value); setDraftEnabled(true); }}
                     program={allClasses.find(c => c.id === filterClass)?.name}
                     placeholder="Enter the topic covered today..."
                     className="max-w-md"

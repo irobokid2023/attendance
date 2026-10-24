@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { LogIn, UserPlus, KeyRound } from 'lucide-react';
+import { sendPasswordResetEmail } from '@/lib/passwordRecovery';
 
 
 const Auth = () => {
@@ -21,12 +22,25 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
     if (mode === 'forgot') {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) toast.error(error.message);
-      else toast.success('Password reset email sent! Check your inbox.');
-      setLoading(false);
+      try {
+        // Device-independent reset link pointing at the published app. The
+        // app's `/` entry point forwards recovery tokens to `/reset-password`.
+        const { error } = await sendPasswordResetEmail(email);
+        if (error) {
+          const message = error.message.toLowerCase();
+          if (message.includes('rate limit')) {
+            toast.error('Too many reset requests. Please wait a minute and try again.');
+          } else {
+            toast.error(error.message);
+          }
+        } else {
+          toast.success('If an account exists for this email, a reset link is on its way. Check your inbox and spam folder.');
+        }
+      } catch {
+        toast.error('Could not send the reset email. Check your connection and try again.');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
     if (mode === 'login') {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { logActivity } from '@/lib/activityLogger';
@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import ExportDropdown from '@/components/ExportDropdown';
 import { exportToExcel } from '@/lib/exportExcel';
 import { exportToPdf } from '@/lib/exportPdf';
+import { clearPageDraft, readPageDraft, writePageDraft } from '@/lib/pageDrafts';
 
 const GRADE_OPTIONS = ['Excellent', 'Very Good', 'Good', 'Average'] as const;
 type GradeValue = typeof GRADE_OPTIONS[number];
@@ -46,8 +47,13 @@ const Grading = () => {
   // Records state
   const [records, setRecords] = useState<any[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
+  const [loadedDraftKey, setLoadedDraftKey] = useState('');
+  const [draftEnabled, setDraftEnabled] = useState(false);
+  const [filtersRestored, setFiltersRestored] = useState(false);
+  const restoringFilters = useRef(false);
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
+  const gradingDraftKey = filterClass ? `grading:${filterClass}:${dateStr}` : '';
 
   useEffect(() => {
     Promise.all([
@@ -56,8 +62,20 @@ const Grading = () => {
     ]).then(([schoolsRes, classesRes]) => {
       setSchools(schoolsRes.data ?? []);
       setAllClasses(classesRes.data ?? []);
+      const savedView = user ? readPageDraft<{ schoolId: string; classId: string; day: string; date: string }>(user.id, 'grading-view') : null;
+      if (savedView && (classesRes.data ?? []).some((cls) => cls.id === savedView.classId && cls.school_id === savedView.schoolId)) {
+        restoringFilters.current = true;
+        setFilterSchool(savedView.schoolId);
+        setFilterClass(savedView.classId);
+        setFilterDay(savedView.day || '');
+        if (savedView.date) {
+          const [year, month, day] = savedView.date.split('-').map(Number);
+          if (year && month && day) setSelectedDate(new Date(year, month - 1, day));
+        }
+      }
+      setFiltersRestored(true);
     });
-  }, []);
+  }, [user?.id]);
 
   const filteredClasses = useMemo(() => {
     if (!filterSchool) return [];
@@ -74,7 +92,19 @@ const Grading = () => {
     return [...days].sort();
   }, [allClasses, filterSchool]);
 
-  useEffect(() => { setFilterClass(''); setFilterDay(''); }, [filterSchool]);
+  useEffect(() => {
+    if (restoringFilters.current) {
+      restoringFilters.current = false;
+      return;
+    }
+    setFilterClass('');
+    setFilterDay('');
+  }, [filterSchool]);
+
+  useEffect(() => {
+    if (!user || !filtersRestored) return;
+    writePageDraft(user.id, 'grading-view', { schoolId: filterSchool, classId: filterClass, day: filterDay, date: dateStr });
+  }, [user?.id, filtersRestored, filterSchool, filterClass, filterDay, dateStr]);
 
   // Fetch students & existing grading
   useEffect(() => {
@@ -89,11 +119,21 @@ const Grading = () => {
       (gradingRes.data ?? []).forEach((g: any) => {
         gradingMap[g.student_id] = g.grade_value as GradeValue;
       });
-      setGrading({ ...gradingMap });
+      const draft = user && gradingDraftKey
+        ? readPageDraft<Record<string, GradeValue | ''>>(user.id, gradingDraftKey)
+        : null;
+      setGrading(draft ?? { ...gradingMap });
       setExistingGrading({ ...gradingMap });
+      setDraftEnabled(Boolean(draft));
+      setLoadedDraftKey(gradingDraftKey);
     };
     fetchData();
-  }, [filterClass, dateStr]);
+  }, [filterClass, dateStr, user?.id]);
+
+  useEffect(() => {
+    if (!user || !gradingDraftKey || loadedDraftKey !== gradingDraftKey || !draftEnabled) return;
+    writePageDraft(user.id, gradingDraftKey, grading);
+  }, [user?.id, gradingDraftKey, loadedDraftKey, draftEnabled, grading]);
 
   // Fetch records when switching to records tab
   useEffect(() => {
@@ -112,6 +152,7 @@ const Grading = () => {
   }, [activeTab, filterClass]);
 
   const handleGradeChange = (studentId: string, grade: GradeValue) => {
+    setDraftEnabled(true);
     setGrading(prev => ({
       ...prev,
       [studentId]: prev[studentId] === grade ? '' : grade,
@@ -143,6 +184,8 @@ const Grading = () => {
       const { error } = await supabase.from('grading').insert(rows);
       if (error) throw error;
       toast.success('Grading saved successfully');
+      clearPageDraft(user.id, gradingDraftKey);
+      setDraftEnabled(false);
       const cls = allClasses.find(c => c.id === filterClass);
       logActivity({ action: 'created', section: 'grading', description: `Saved grading for ${cls ? [cls.name, cls.grade, cls.div].filter(Boolean).join(' - ') : 'class'}` });
       setExistingGrading({ ...grading });

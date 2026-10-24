@@ -23,7 +23,18 @@ const Index = () => {
       return;
     }
     if (!loading) {
-      navigate(user ? '/dashboard' : '/auth', { replace: true });
+      let lastPage = '';
+      if (user) {
+        try {
+          lastPage = localStorage.getItem(`irobokid:last-page:${user.id}`) || '';
+        } catch {
+          lastPage = '';
+        }
+      }
+      const safeLastPage = /^\/(dashboard|schools|classes|students|manage|attendance|media|topics|payments|misc-tasks|calendar|grading|activity-log|admin|admin-settings|schedule|instructor-attendance|analytics|profile)$/.test(lastPage)
+        ? lastPage
+        : '/dashboard';
+      navigate(user ? safeLastPage : '/auth', { replace: true });
     }
   }, [user, loading, navigate]);
 
