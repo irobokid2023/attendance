@@ -18,24 +18,40 @@ const authHeaders = () => ({
 async function findRootFolder(): Promise<string | null> {
   const q = `name='iRobokid Media' and mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false`;
   const url = `${GATEWAY}/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=1`;
-  const res = await fetch(url, { headers: authHeaders() });
+  const res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(25_000) });
   if (!res.ok) throw new Error(`Drive search failed (${res.status}): ${await res.text()}`);
   const json = await res.json();
   return json.files?.[0]?.id ?? null;
 }
 
-async function listChildren(parentId: string): Promise<{ id: string; mimeType: string; size?: string }[]> {
+type DriveFile = { id: string; mimeType: string; size?: string };
+
+class DriveRateLimitError extends Error {
+  constructor() {
+    super('Google Drive is temporarily rate limited. Try again in 60 seconds.');
+    this.name = 'DriveRateLimitError';
+  }
+}
+
+async function listChildren(parentIds: string[]): Promise<DriveFile[]> {
   const out: { id: string; mimeType: string; size?: string }[] = [];
   let pageToken: string | undefined;
   do {
-    const q = `'${parentId}' in parents and trashed=false`;
+    const parentQuery = parentIds
+      .map((id) => `'${id.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}' in parents`)
+      .join(' or ');
+    const q = `(${parentQuery}) and trashed=false`;
     const params = new URLSearchParams({
       q,
-      fields: 'nextPageToken, files(id,mimeType,size)',
+      fields: 'nextPageToken, files(id,mimeType,size,parents)',
       pageSize: '1000',
     });
     if (pageToken) params.set('pageToken', pageToken);
-    const res = await fetch(`${GATEWAY}/drive/v3/files?${params.toString()}`, { headers: authHeaders() });
+    const res = await fetch(`${GATEWAY}/drive/v3/files?${params.toString()}`, {
+      headers: authHeaders(),
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (res.status === 429) throw new DriveRateLimitError();
     if (!res.ok) throw new Error(`Drive list failed (${res.status}): ${await res.text()}`);
     const json = await res.json();
     out.push(...(json.files ?? []));
@@ -51,6 +67,55 @@ const unauthorized = (msg = 'Unauthorized', status = 401) =>
   new Response(JSON.stringify({ error: msg }), {
     status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+
+type DriveUsage = {
+  exists: boolean;
+  total_bytes: number;
+  file_count: number;
+  folder_count: number;
+};
+
+let usageCache: { at: number; value: DriveUsage } | null = null;
+let usageScan: Promise<DriveUsage> | null = null;
+const USAGE_CACHE_MS = 5 * 60 * 1000;
+const USAGE_STALE_MAX_MS = 30 * 60 * 1000;
+
+async function scanDriveUsage(): Promise<DriveUsage> {
+  const rootId = await findRootFolder();
+  if (!rootId) return { exists: false, total_bytes: 0, file_count: 0, folder_count: 0 };
+
+  let totalBytes = 0;
+  let fileCount = 0;
+  let folderCount = 0;
+  let foldersToVisit = [rootId];
+  const FOLDER_MIME = 'application/vnd.google-apps.folder';
+  // Combine parent folders into each query to reduce connector calls and avoid rate limits.
+  while (foldersToVisit.length > 0) {
+    const currentLevel = foldersToVisit;
+    foldersToVisit = [];
+    const filesById = new Map<string, DriveFile>();
+    const parentBatches = Array.from({ length: Math.ceil(currentLevel.length / 20) }, (_, index) =>
+      currentLevel.slice(index * 20, (index + 1) * 20),
+    );
+    for (let i = 0; i < parentBatches.length; i += 2) {
+      const results = await Promise.all(parentBatches.slice(i, i + 2).map(listChildren));
+      for (const children of results) {
+        for (const child of children) filesById.set(child.id, child);
+      }
+    }
+
+    for (const child of filesById.values()) {
+      if (child.mimeType === FOLDER_MIME) {
+        folderCount += 1;
+        foldersToVisit.push(child.id);
+      } else {
+        fileCount += 1;
+        if (child.size) totalBytes += Number(child.size);
+      }
+    }
+  }
+  return { exists: true, total_bytes: totalBytes, file_count: fileCount, folder_count: folderCount };
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -74,43 +139,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    const rootId = await findRootFolder();
-    if (!rootId) {
-      return new Response(JSON.stringify({ ok: true, total_bytes: 0, file_count: 0, folder_count: 0, exists: false }), {
+    if (usageCache && Date.now() - usageCache.at < USAGE_CACHE_MS) {
+      return new Response(JSON.stringify({ ok: true, ...usageCache.value, cached: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    let totalBytes = 0;
-    let fileCount = 0;
-    let folderCount = 0;
-    const stack: string[] = [rootId];
-    const FOLDER_MIME = 'application/vnd.google-apps.folder';
-
-    while (stack.length) {
-      const parent = stack.pop()!;
-      const children = await listChildren(parent);
-      for (const c of children) {
-        if (c.mimeType === FOLDER_MIME) {
-          folderCount++;
-          stack.push(c.id);
-        } else {
-          fileCount++;
-          if (c.size) totalBytes += Number(c.size);
-        }
-      }
+    if (!usageScan) {
+      usageScan = scanDriveUsage().finally(() => { usageScan = null; });
     }
-
-    return new Response(JSON.stringify({
-      ok: true,
-      exists: true,
-      total_bytes: totalBytes,
-      file_count: fileCount,
-      folder_count: folderCount,
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    let usage: DriveUsage;
+    try {
+      usage = await usageScan;
+    } catch (error) {
+      if (error instanceof DriveRateLimitError && usageCache && Date.now() - usageCache.at < USAGE_STALE_MAX_MS) {
+        return new Response(JSON.stringify({ ok: true, ...usageCache.value, cached: true, stale: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw error;
+    }
+    usageCache = { at: Date.now(), value: usage };
+    return new Response(JSON.stringify({ ok: true, ...usage }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String((e as any)?.message ?? e) }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const rateLimited = e instanceof DriveRateLimitError;
+    return new Response(JSON.stringify({ error: String((e as Error)?.message ?? e) }), {
+      status: rateLimited ? 429 : 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', ...(rateLimited ? { 'Retry-After': '60' } : {}) },
     });
   }
 });
