@@ -1,5 +1,5 @@
 import { ReactNode, createContext, useContext, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import UserAvatar from './UserAvatar';
 import NotificationBell from './NotificationBell';
@@ -29,6 +29,7 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
+  const location = useLocation();
   const [fullName, setFullName] = useState<string>('');
 
   useEffect(() => {
@@ -40,6 +41,15 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
       .maybeSingle()
       .then(({ data }) => setFullName(data?.full_name || ''));
   }, [user, nested]);
+
+  useEffect(() => {
+    if (!user || nested) return;
+    try {
+      localStorage.setItem(`irobokid:last-page:${user.id}`, location.pathname);
+    } catch {
+      // Resume navigation is best-effort when browser storage is unavailable.
+    }
+  }, [user?.id, location.pathname, nested]);
 
   if (nested) {
     // Rendered inside another DashboardLayout — just pass children through.

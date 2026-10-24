@@ -136,27 +136,6 @@ const UsageAnalytics = () => {
 
     const { data: sizeRows } = await supabase.rpc('get_table_sizes' as any);
 
-    // Fetch Google Drive media storage usage
-    setDriveError(null);
-    try {
-      const { data: driveData, error: driveErr } = await supabase.functions.invoke('drive-storage', { body: {} });
-      if (driveErr) throw driveErr;
-      if (driveData?.ok) {
-        setDriveStorage({
-          total_bytes: Number(driveData.total_bytes || 0),
-          file_count: Number(driveData.file_count || 0),
-          folder_count: Number(driveData.folder_count || 0),
-          exists: !!driveData.exists,
-        });
-      } else if (driveData?.error) {
-        setDriveError(String(driveData.error));
-        setDriveStorage(null);
-      }
-    } catch (e: any) {
-      setDriveError(String(e?.message ?? e));
-      setDriveStorage(null);
-    }
-
     setSeries(built);
     setTotals(totalsAcc);
     setRowCounts(Object.fromEntries(rowCountResults));
@@ -172,6 +151,31 @@ const UsageAnalytics = () => {
     })();
     return () => { cancelled = true; };
   }, [load, refreshTick]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDriveError(null);
+    supabase.functions.invoke('drive-storage', { body: {} }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) throw error;
+      if (data?.ok) {
+        setDriveStorage({
+          total_bytes: Number(data.total_bytes || 0),
+          file_count: Number(data.file_count || 0),
+          folder_count: Number(data.folder_count || 0),
+          exists: !!data.exists,
+        });
+      } else if (data?.error) {
+        setDriveError(String(data.error));
+        setDriveStorage(null);
+      }
+    }).catch((error: unknown) => {
+      if (cancelled) return;
+      setDriveError(error instanceof Error ? error.message : String(error));
+      setDriveStorage(null);
+    });
+    return () => { cancelled = true; };
+  }, [refreshTick]);
 
   const totalRows = useMemo(
     () => Object.values(rowCounts).reduce((a, b) => a + b, 0),
